@@ -53,6 +53,9 @@ pub struct EndpointMeta {
     /// JSON Schema describing the response payload, when applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_schema: Option<serde_json::Value>,
+    /// Tags used to group the endpoint in the documentation UI.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 /// Static-lifetime version of [`EndpointMeta`] used for compile-time
@@ -73,6 +76,8 @@ pub struct EndpointMetaStatic {
     pub description: Option<&'static str>,
     /// HTTP verb, if applicable.
     pub method: Option<&'static str>,
+    /// Tags for grouping, as a static string slice.
+    pub tags: &'static [&'static str],
 }
 
 impl EndpointMetaStatic {
@@ -86,6 +91,7 @@ impl EndpointMetaStatic {
             method: self.method.map(|s| s.to_owned()),
             request_schema: None,
             response_schema: None,
+            tags: self.tags.iter().map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -122,6 +128,7 @@ impl EndpointMeta {
             method: None,
             request_schema: None,
             response_schema: None,
+            tags: Vec::new(),
         }
     }
 }
@@ -178,5 +185,6 @@ mod tests {
         assert!(deserialized.method.is_none());
         assert!(deserialized.request_schema.is_none());
         assert!(deserialized.response_schema.is_none());
+        assert!(deserialized.tags.is_empty());
     }
 }

@@ -5,6 +5,7 @@
 //! endpoint in the global [`EndpointRegistry`] at link time.
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
@@ -19,6 +20,8 @@ pub struct HttpArgs {
     pub path: String,
     /// Optional human-readable description of the endpoint.
     pub description: Option<String>,
+    /// Optional comma-separated tags for grouping in the documentation UI.
+    pub tags: Vec<String>,
 }
 
 impl Parse for HttpArgs {
@@ -28,6 +31,7 @@ impl Parse for HttpArgs {
         let mut method: Option<LitStr> = None;
         let mut path: Option<LitStr> = None;
         let mut description: Option<LitStr> = None;
+        let mut tags: Option<LitStr> = None;
 
         // Parse a comma-separated list of `key = "value"` pairs.
         while !input.is_empty() {
@@ -63,11 +67,20 @@ impl Parse for HttpArgs {
                     }
                     description = Some(value);
                 }
+                "tags" => {
+                    if tags.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            &key,
+                            "duplicate `tags` argument",
+                        ));
+                    }
+                    tags = Some(value);
+                }
                 other => {
                     return Err(syn::Error::new_spanned(
                         &key,
                         format!(
-                            "unknown argument `{other}`; expected one of: method, path, description"
+                            "unknown argument `{other}`; expected one of: method, path, description, tags"
                         ),
                     ));
                 }
@@ -86,10 +99,22 @@ impl Parse for HttpArgs {
         let path = path
             .ok_or_else(|| syn::Error::new(input.span(), "missing required `path` argument"))?;
 
+        let tags_vec: Vec<String> = tags
+            .map(|t| {
+                t.value()
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Ok(HttpArgs {
             method: method.value(),
             path: path.value(),
             description: description.map(|d| d.value()),
+            tags: tags_vec,
         })
     }
 }
@@ -112,6 +137,17 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
         None => quote! { ::core::option::Option::None },
     };
 
+    let tag_lits: Vec<LitStr> = args
+        .tags
+        .iter()
+        .map(|t| LitStr::new(t, Span::call_site()))
+        .collect();
+    let tags_tokens = if tag_lits.is_empty() {
+        quote! { &[] }
+    } else {
+        quote! { &[#(#tag_lits),*] }
+    };
+
     let expanded = quote! {
         #func
 
@@ -122,6 +158,7 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
                 protocol:    ::lucy::_private::lucy_types::endpoint::Protocol::Http,
                 description: #description_tokens,
                 method:      ::core::option::Option::Some(#method),
+                tags:        #tags_tokens,
             }
         }
     };
