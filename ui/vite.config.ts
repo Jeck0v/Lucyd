@@ -7,6 +7,12 @@ import react from '@vitejs/plugin-react'
  */
 export default defineConfig({
   plugins: [react()],
+
+  // Base public path — all asset references in the built index.html will be
+  // prefixed with /docs/ so the browser fetches them from the right location
+  // when the app is served at http://host/docs/ by lucy-core.
+  base: '/docs/',
+
   build: {
     outDir: 'dist',
   },
