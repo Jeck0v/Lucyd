@@ -2,6 +2,14 @@
  
 **Lucy** is a set of internal development tools designed for the Flipper project, an interactive documentation and API testing interface developed in Rust.  
 
+
+## If you work on my backend, please respect the following rules
+- 1 feature = add unit tests
+- Follow DRY & SOLID principles
+- Write clean code (meaningful variable names, use named constants, etc.)
+- Add inline comments `//` and doc comments `///` for important parts
+
+
 ---
  
 ## Why Lucy?
