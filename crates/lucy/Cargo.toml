@@ -1,0 +1,9 @@
+[package]
+name    = "lucy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lucy-core  = { path = "../lucy-core" }
+lucy-macro = { path = "../lucy-macro" }
