@@ -12,3 +12,7 @@ proc-macro2 = { workspace = true }
 syn         = { workspace = true }
 quote       = { workspace = true }
 lucy-types  = { path = "../lucy-types" }
+inventory   = { workspace = true }
+
+[dev-dependencies]
+lucy-core = { path = "../lucy-core" }

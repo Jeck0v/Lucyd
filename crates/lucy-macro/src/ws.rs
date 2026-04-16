@@ -1,25 +1,17 @@
 //! Implementation of the `#[lucy_ws(...)]` attribute macro.
 //!
-//! Parses the attribute arguments into [`WsArgs`] and currently emits the
-//! annotated function unchanged. The registration side-effect is reserved for
-//! a future task once `lucy-core` exposes a stable registration API.
+//! Parses the attribute arguments into [`WsArgs`] and emits the annotated
+//! function along with an `inventory::submit!` block that registers the
+//! endpoint in the global [`EndpointRegistry`] at link time.
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, Ident, ItemFn, LitStr, Token,
 };
 
-// Identifier of the future registry registration function that the expansion
-// will call. Kept as a constant to avoid spreading the literal across sites.
-const REGISTRY_FN_IDENT: &str = "lucy_register_ws";
-
 /// Parsed arguments for the `#[lucy_ws(...)]` attribute.
-// Fields are currently consumed only to validate parsing; they will be used
-// when the registration side-effect is emitted in a future task.
-#[allow(dead_code)]
 pub struct WsArgs {
     /// WebSocket upgrade path, e.g. `"/ws/events"`.
     pub path: String,
@@ -88,20 +80,33 @@ impl Parse for WsArgs {
 
 /// Expands the `#[lucy_ws(...)]` attribute.
 ///
-/// Parses the attribute arguments, validates them, and returns the annotated
-/// function unchanged. Registration code will be injected here in a future
-/// task via [`REGISTRY_FN_IDENT`].
-// TESTME: integration test in xtask
+/// Parses the attribute arguments, validates them, and emits the original
+/// function together with an `inventory::submit!` block that registers the
+/// endpoint metadata at link time.
 pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let _args = parse_macro_input!(attr as WsArgs);
+    let args = parse_macro_input!(attr as WsArgs);
     let func = parse_macro_input!(item as ItemFn);
 
-    // Reference the constant so the compiler does not warn about it being
-    // unused while the registration feature is still pending.
-    let _ = REGISTRY_FN_IDENT;
+    let fn_name = func.sig.ident.to_string();
+    let path    = &args.path;
 
-    // TODO(registration): emit a side-effect call to REGISTRY_FN_IDENT
-    // once lucy-core exposes a stable registration API.
-    let expanded: TokenStream2 = quote! { #func };
+    let description_tokens = match &args.description {
+        Some(desc) => quote! { ::core::option::Option::Some(#desc) },
+        None => quote! { ::core::option::Option::None },
+    };
+
+    let expanded = quote! {
+        #func
+
+        ::lucy::_private::inventory::submit! {
+            ::lucy::_private::lucy_types::endpoint::EndpointMetaStatic {
+                name:        #fn_name,
+                path:        #path,
+                protocol:    ::lucy::_private::lucy_types::endpoint::Protocol::WebSocket,
+                description: #description_tokens,
+                method:      ::core::option::Option::None,
+            }
+        }
+    };
     expanded.into()
 }

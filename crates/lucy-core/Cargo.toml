@@ -10,3 +10,4 @@ tokio       = { workspace = true }
 serde_json  = { workspace = true }
 rust-embed  = { workspace = true }
 lucy-types  = { path = "../lucy-types" }
+inventory   = { workspace = true }

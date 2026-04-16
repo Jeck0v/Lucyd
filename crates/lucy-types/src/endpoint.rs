@@ -55,6 +55,47 @@ pub struct EndpointMeta {
     pub response_schema: Option<serde_json::Value>,
 }
 
+/// Static-lifetime version of [`EndpointMeta`] used for compile-time
+/// registration via the `inventory` crate.
+///
+/// Proc-macro generated code emits `inventory::submit!` blocks containing
+/// this type (all fields are `&'static str`, which is const-constructible).
+/// At runtime, [`EndpointMetaStatic::into_endpoint_meta`] converts each
+/// entry into a heap-allocated [`EndpointMeta`].
+pub struct EndpointMetaStatic {
+    /// Display name of the endpoint.
+    pub name: &'static str,
+    /// URL path or MQTT topic string.
+    pub path: &'static str,
+    /// Transport protocol.
+    pub protocol: Protocol,
+    /// Optional human-readable description.
+    pub description: Option<&'static str>,
+    /// HTTP verb, if applicable.
+    pub method: Option<&'static str>,
+}
+
+impl EndpointMetaStatic {
+    /// Converts the static reference into an owned [`EndpointMeta`].
+    pub fn into_endpoint_meta(&self) -> EndpointMeta {
+        EndpointMeta {
+            name: self.name.to_owned(),
+            path: self.path.to_owned(),
+            protocol: self.protocol.clone(),
+            description: self.description.map(|s| s.to_owned()),
+            method: self.method.map(|s| s.to_owned()),
+            request_schema: None,
+            response_schema: None,
+        }
+    }
+}
+
+// Declare EndpointMetaStatic as an inventory-collectable type.
+// Must appear exactly once across the entire binary.
+// Proc-macro generated code calls `::inventory::submit! { EndpointMetaStatic { ... } }`
+// and lucy-core drains `::inventory::iter::<EndpointMetaStatic>()` on first registry access.
+inventory::collect!(EndpointMetaStatic);
+
 impl EndpointMeta {
     /// Create a new [`EndpointMeta`] with only the mandatory fields populated.
     ///

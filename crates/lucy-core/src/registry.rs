@@ -6,7 +6,7 @@
 //! registration code can safely populate it from multiple threads at
 //! program start-up.
 
-use lucy_types::endpoint::EndpointMeta;
+use lucy_types::endpoint::{EndpointMeta, EndpointMetaStatic};
 use std::sync::{Mutex, OnceLock};
 
 /// Global singleton registry, initialised once at startup.
@@ -18,11 +18,27 @@ static REGISTRY: OnceLock<Mutex<EndpointRegistry>> = OnceLock::new();
 
 /// Returns the global [`EndpointRegistry`], initialising it on first call.
 ///
+/// On first invocation the registry is populated by draining all
+/// [`EndpointMeta`] items submitted via `::inventory::submit!` blocks
+/// emitted by the Lucy proc-macros. Subsequent calls return the same
+/// already-populated registry.
+///
 /// The returned reference has `'static` lifetime and is safe to share
 /// across threads. Callers must acquire the inner [`Mutex`] lock before
 /// reading or writing the registry.
 pub fn global_registry() -> &'static Mutex<EndpointRegistry> {
-    REGISTRY.get_or_init(|| Mutex::new(EndpointRegistry::new()))
+    REGISTRY.get_or_init(|| {
+        let mut registry = EndpointRegistry::new();
+
+        // Drain all endpoints submitted via `::inventory::submit!` by
+        // proc-macro generated code. This runs exactly once, before the
+        // first HTTP request hits spec_handler.
+        for meta in inventory::iter::<EndpointMetaStatic>() {
+            registry.register(meta.into_endpoint_meta());
+        }
+
+        Mutex::new(registry)
+    })
 }
 
 /// Stores all annotated endpoints discovered at startup.

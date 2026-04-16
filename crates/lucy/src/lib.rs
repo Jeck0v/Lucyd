@@ -46,3 +46,15 @@ pub use lucy_core::router::docs_router;        // Axum router serving the `/docs
 pub use lucy_macro::lucy_http; // Attribute macro for HTTP REST handlers
 pub use lucy_macro::lucy_mqtt; // Attribute macro for MQTT topic handlers
 pub use lucy_macro::lucy_ws;   // Attribute macro for WebSocket handlers
+
+/// Hidden re-exports required by macro-generated code.
+///
+/// Proc-macros emit `::lucy::_private::inventory::submit!` and
+/// `::lucy::_private::lucy_types::...` so that consumer crates only need
+/// `lucy` as a dependency — they do not need to depend on `inventory` or
+/// `lucy-types` directly.
+#[doc(hidden)]
+pub mod _private {
+    pub use inventory;
+    pub use lucy_types;
+}
