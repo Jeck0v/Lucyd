@@ -20,6 +20,8 @@ export interface EndpointMeta {
   method?: string
   request_schema?: unknown
   response_schema?: unknown
+  /** Classification tags for grouping endpoints (e.g. ["screens", "api"]). */
+  tags?: string[]
 }
 
 /**
@@ -28,4 +30,23 @@ export interface EndpointMeta {
 export interface ApiSpec {
   version: string
   endpoints: EndpointMeta[]
+}
+
+/** A single message in a WebSocket conversation log. */
+export interface WsMessage {
+  id: number
+  /** `'in'` = received from server, `'out'` = sent by the user. */
+  direction: 'in' | 'out'
+  payload: string
+  /** Formatted as `HH:mm:ss`. */
+  timestamp: string
+}
+
+/** A single message captured on an MQTT topic. */
+export interface MqttMessage {
+  id: number
+  topic: string
+  payload: string
+  /** Formatted as `HH:mm:ss`. */
+  timestamp: string
 }

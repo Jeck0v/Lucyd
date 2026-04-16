@@ -4,6 +4,8 @@ import { useSpec } from './hooks/useSpec'
 import { HttpPanel } from './panels/HttpPanel'
 import { WsPanel } from './panels/WsPanel'
 import { MqttPanel } from './panels/MqttPanel'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthModal } from './components/AuthModal'
 import type { Protocol } from './types'
 
 /** The three protocol tabs available in the Lucy UI. */
@@ -25,15 +27,23 @@ const TAB_LABELS: Record<ActiveTab, string> = {
 
 const TABS: ActiveTab[] = ['http', 'ws', 'mqtt']
 
+// ---------------------------------------------------------------------------
+// Inner app (needs AuthProvider in scope for useAuth)
+// ---------------------------------------------------------------------------
+
 /**
  * Root application component for Lucy.
  *
  * Fetches the API spec from the Rust/Axum backend, splits endpoints by
  * protocol, and renders the appropriate panel based on the active tab.
  */
-function App(): React.JSX.Element {
+function AppInner(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<ActiveTab>('http')
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const { spec, loading, error } = useSpec()
+  const { auth } = useAuth()
+
+  const isAuthConfigured = auth.type !== 'none'
 
   const filteredEndpoints =
     spec?.endpoints.filter(
@@ -43,10 +53,26 @@ function App(): React.JSX.Element {
   return (
     <div className="app">
       <header className="app__header">
-        <h1 className="app__title">Lucy</h1>
-        {spec !== null && (
-          <p className="app__version">Spec version: {spec.version}</p>
-        )}
+        <div className="app__header-left">
+          <h1 className="app__title">Lucy</h1>
+          {spec !== null && (
+            <p className="app__version">Spec version: {spec.version}</p>
+          )}
+        </div>
+
+        <button
+          className={[
+            'btn--authorize',
+            isAuthConfigured ? 'btn--authorize--active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => setShowAuthModal(true)}
+          aria-haspopup="dialog"
+          aria-expanded={showAuthModal}
+        >
+          {isAuthConfigured ? `Authorized (${auth.type})` : 'Authorize'}
+        </button>
       </header>
 
       <nav aria-label="Protocol tabs">
@@ -103,7 +129,23 @@ function App(): React.JSX.Element {
           <MqttPanel endpoints={filteredEndpoints} />
         )}
       </main>
+
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Root export — wraps everything in AuthProvider
+// ---------------------------------------------------------------------------
+
+function App(): React.JSX.Element {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }
 
