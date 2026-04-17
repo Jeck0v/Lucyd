@@ -1,0 +1,18 @@
+[package]
+name    = "lucy-macro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+syn         = { workspace = true }
+quote       = { workspace = true }
+lucy-types  = { path = "../lucy-types" }
+inventory   = { workspace = true }
+
+[dev-dependencies]
+lucy-core = { path = "../lucy-core" }

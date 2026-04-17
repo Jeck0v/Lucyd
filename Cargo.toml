@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members  = [
+    "crates/lucy",
+    "crates/lucy-types",
+    "crates/lucy-macro",
+    "crates/lucy-core",
+    "xtask",
+]
+exclude = ["ui"]
+
+[workspace.package]
+version     = "0.1.0"
+edition     = "2021"
+license     = "MIT"
+authors     = ["Jeck0v"]
+repository  = "https://github.com/FlipGame-Hetic/Lucy"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.44.2", features = ["full"] }
+
+# Web framework
+axum = "0.8.4"
+
+# Serialization
+serde      = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+
+# Proc-macro utilities
+proc-macro2 = "1.0.95"
+syn         = { version = "2.0.100", features = ["full"] }
+quote       = "1.0.40"
+
+# Asset embedding
+rust-embed = "8.5.0"
+
+# JSON Schema generation
+schemars = "0.8.22"
+
+# Compile-time static registration
+inventory = "0.3"

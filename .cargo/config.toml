@@ -1,0 +1,4 @@
+# Cargo aliases for Lucy development workflow
+[alias]
+# Run: cargo xtask <command>
+xtask = "run --package xtask --"

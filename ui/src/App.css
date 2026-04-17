@@ -1,0 +1,790 @@
+/* =====================================================================
+   Lucy UI — base application styles
+   No inline styles are used in components; all visual logic lives here.
+   ===================================================================== */
+
+/* --- Reset & base --------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, sans-serif;
+  background-color: #0f1117;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+/* --- Layout --------------------------------------------------------- */
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.app__header {
+  margin-bottom: 2rem;
+}
+
+.app__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.app__version {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+/* --- Tab bar -------------------------------------------------------- */
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 2px solid #1e293b;
+  margin-bottom: 1.5rem;
+  list-style: none;
+}
+
+.tab-bar__button {
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab-bar__button:hover {
+  color: #e2e8f0;
+}
+
+.tab-bar__button--active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
+/* --- Panel container ------------------------------------------------ */
+.panel {
+  animation: panel-fade-in 0.15s ease;
+}
+
+@keyframes panel-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Feedback states ------------------------------------------------ */
+.panel-loading,
+.panel-error,
+.panel-empty {
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: #64748b;
+  border: 1px dashed #1e293b;
+  border-radius: 8px;
+}
+
+.panel-error {
+  color: #f87171;
+  border-color: #450a0a;
+  background-color: #1c0707;
+}
+
+/* --- Endpoint list -------------------------------------------------- */
+.endpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+}
+
+/* --- Endpoint card -------------------------------------------------- */
+.endpoint-card {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  transition: border-color 0.15s ease;
+}
+
+.endpoint-card:hover {
+  border-color: #475569;
+}
+
+.endpoint-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.endpoint-card__path {
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+.endpoint-card__description {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* --- Method badge --------------------------------------------------- */
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 52px;
+  /* Ensure minimum touch target size (WCAG 2.5.8) */
+  min-height: 24px;
+}
+
+.method-badge--get    { background-color: #14532d; color: #4ade80; }
+.method-badge--post   { background-color: #1e3a5f; color: #60a5fa; }
+.method-badge--put    { background-color: #451a03; color: #fb923c; }
+.method-badge--patch  { background-color: #3b1d72; color: #c084fc; }
+.method-badge--delete { background-color: #450a0a; color: #f87171; }
+.method-badge--ws     { background-color: #134e4a; color: #2dd4bf; }
+.method-badge--mqtt   { background-color: #3b2800; color: #fbbf24; }
+
+/* =====================================================================
+   Interactive endpoint card — collapsible
+   ===================================================================== */
+
+/* Override default card padding when it wraps a toggle button. */
+.endpoint-card:has(.endpoint-card__toggle) {
+  padding: 0;
+}
+
+/* ── Toggle (header button) ------------------------------------------- */
+.endpoint-card__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.endpoint-card__toggle:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.endpoint-card__toggle:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: -2px;
+}
+
+/* Summary text (description shown inline in header) */
+.endpoint-card__summary {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Chevron indicator */
+.endpoint-card__chevron {
+  margin-left: auto;
+  font-size: 1.25rem;
+  color: #475569;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease, color 0.15s ease;
+  /* Shift rotation origin so it spins naturally */
+  display: inline-block;
+}
+
+.endpoint-card__chevron--open {
+  transform: rotate(90deg);
+  color: #60a5fa;
+}
+
+/* ── Expandable body -------------------------------------------------- */
+.endpoint-card__body {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid #1e293b;
+  animation: body-reveal 0.15s ease;
+}
+
+@keyframes body-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =====================================================================
+   Form sections & controls
+   ===================================================================== */
+
+.form-section {
+  margin-top: 1rem;
+}
+
+.form-section--inline {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-section--actions {
+  margin-top: 0.5rem;
+}
+
+.form-section__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.form-section__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.625rem;
+}
+
+.form-section__badge {
+  /* Purely presentational — no extra background, just label styling. */
+  color: #94a3b8;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-label {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background-color: #0f1117;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Minimum target size (WCAG 2.5.8) */
+  min-height: 36px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+}
+
+.form-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  background-color: #0f1117;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 0.8125rem;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+}
+
+/* Inline row: input + button side by side */
+.form-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.form-row .form-input {
+  flex: 1;
+}
+
+/* =====================================================================
+   Buttons
+   ===================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  /* WCAG 2.5.8 minimum target size */
+  min-height: 36px;
+  min-width: 36px;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  background-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.btn--danger {
+  background-color: #7f1d1d;
+  color: #fecaca;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: #991b1b;
+}
+
+.btn--connect {
+  background-color: #14532d;
+  color: #bbf7d0;
+}
+
+.btn--connect:hover:not(:disabled) {
+  background-color: #166534;
+}
+
+.btn--ghost {
+  background-color: transparent;
+  color: #64748b;
+  border: 1px solid #334155;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background-color: #1e293b;
+  color: #94a3b8;
+}
+
+/* =====================================================================
+   Response panel
+   ===================================================================== */
+
+.response-panel {
+  margin-top: 1rem;
+  background-color: #0a0f1a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.response-panel--error {
+  border-color: #450a0a;
+  background-color: #1c0707;
+  padding: 0.75rem 1rem;
+  color: #f87171;
+  font-size: 0.875rem;
+}
+
+.response-panel__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid #1e293b;
+  background-color: #111827;
+}
+
+.response-body {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Status badge ───────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-height: 24px;
+}
+
+.status-badge--ok {
+  background-color: #14532d;
+  color: #4ade80;
+}
+
+.status-badge--warn {
+  background-color: #451a03;
+  color: #fb923c;
+}
+
+.status-badge--error {
+  background-color: #450a0a;
+  color: #f87171;
+}
+
+/* Response latency label */
+.response-latency {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================================
+   Status dot (WebSocket / MQTT connection indicator)
+   ===================================================================== */
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--connected {
+  background-color: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+
+.status-dot--disconnected {
+  background-color: #475569;
+}
+
+/* =====================================================================
+   WebSocket / MQTT message log
+   ===================================================================== */
+
+.message-log {
+  max-height: 280px;
+  overflow-y: auto;
+  background-color: #0a0f1a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.5rem 0;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.message-log__empty {
+  padding: 1rem;
+  text-align: center;
+  color: #475569;
+  font-size: 0.8125rem;
+  font-family: inherit;
+}
+
+.message-log__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  line-height: 1.5;
+  transition: background-color 0.1s ease;
+}
+
+.message-log__item:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Incoming messages — cyan accent */
+.message-log__item--in .message-log__payload {
+  color: #2dd4bf;
+}
+
+.message-log__item--in .message-log__direction {
+  color: #2dd4bf;
+}
+
+/* Outgoing messages — muted blue-grey */
+.message-log__item--out .message-log__payload {
+  color: #93c5fd;
+}
+
+.message-log__item--out .message-log__direction {
+  color: #60a5fa;
+}
+
+.message-log__time {
+  color: #475569;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.message-log__direction {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+  width: 1ch;
+  text-align: center;
+}
+
+.message-log__payload {
+  flex: 1;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* =====================================================================
+   WebSocket inline error label
+   ===================================================================== */
+
+.ws-status-error {
+  font-size: 0.8125rem;
+  color: #f87171;
+}
+
+/* =====================================================================
+   MQTT broker bar
+   ===================================================================== */
+
+.broker-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 1.25rem;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+
+.broker-bar__label {
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.broker-bar__input {
+  flex: 1;
+}
+
+/* =====================================================================
+   Auth modal
+   ===================================================================== */
+
+.auth-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.auth-modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; width: 480px; max-width: calc(100vw - 2rem); }
+.auth-modal__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+.auth-modal__title { font-size: 1.1rem; font-weight: 600; color: #f8fafc; }
+.auth-modal__close { background: none; border: none; color: #64748b; font-size: 1.25rem; cursor: pointer; line-height: 1; padding: 0.25rem; border-radius: 4px; }
+.auth-modal__close:hover { color: #e2e8f0; }
+.auth-modal__close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.auth-modal__tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; }
+.auth-tab { background: none; border: none; color: #64748b; padding: 0.4rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.875rem; min-height: 32px; }
+.auth-tab:hover { color: #94a3b8; }
+.auth-tab:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.auth-tab--active { background: #0f172a; color: #60a5fa; }
+.auth-modal__hint { font-size: 0.875rem; color: #64748b; padding: 0.75rem 0; }
+.auth-modal__field-hint { font-size: 0.8rem; color: #64748b; margin-top: 0.375rem; }
+.auth-modal__field-hint code { color: #7dd3fc; font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace; }
+.auth-modal__actions { margin-top: 1.25rem; display: flex; justify-content: flex-end; }
+
+/* =====================================================================
+   Authorize button in header
+   ===================================================================== */
+
+.app__header { display: flex; align-items: flex-start; justify-content: space-between; }
+.app__header-left {}
+.btn--authorize { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; white-space: nowrap; min-height: 36px; }
+.btn--authorize:hover { border-color: #60a5fa; color: #60a5fa; }
+.btn--authorize:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.btn--authorize--active { border-color: #4ade80; color: #4ade80; }
+.btn--authorize--active:hover { border-color: #86efac; color: #86efac; }
+
+/* Auth info label displayed inside expanded cards */
+.auth-info-label {
+  font-size: 0.8125rem;
+  color: #64748b;
+  padding: 0.375rem 0;
+}
+
+.auth-info-label strong {
+  color: #4ade80;
+}
+
+.auth-info-label code {
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  color: #7dd3fc;
+  font-size: 0.8rem;
+}
+
+/* =====================================================================
+   cURL display
+   ===================================================================== */
+
+.curl-display { margin-top: 0.75rem; background: #0f172a; border: 1px solid #1e3a5f; border-radius: 6px; overflow: hidden; }
+.curl-display__header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e3a5f; }
+.curl-display__label { font-size: 0.75rem; color: #64748b; font-family: monospace; }
+.curl-display__copy { background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 3px; min-height: 24px; }
+.curl-display__copy:hover { color: #60a5fa; }
+.curl-display__copy:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.curl-display__code { padding: 0.75rem; margin: 0; font-size: 0.75rem; line-height: 1.6; color: #7dd3fc; overflow-x: auto; white-space: pre; font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace; }
+
+/* =====================================================================
+   Endpoint groups (tag-based collapsible sections)
+   ===================================================================== */
+
+.endpoint-group { margin-bottom: 1rem; }
+.endpoint-group__header { width: 100%; background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 0.625rem 1rem; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: #94a3b8; font-size: 0.9rem; font-weight: 500; }
+.endpoint-group__header:hover { border-color: #334155; color: #e2e8f0; }
+.endpoint-group__header:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.endpoint-group__tag { text-transform: capitalize; }
+.endpoint-group__count { background: #1e293b; border-radius: 99px; padding: 0.1rem 0.5rem; font-size: 0.75rem; color: #64748b; }
+.endpoint-group__chevron { margin-left: auto; font-size: 0.75rem; transition: transform 0.2s; }
+.endpoint-group__header--open .endpoint-group__chevron { transform: rotate(180deg); }
+.endpoint-group__body { padding-top: 0.5rem; }
+
+/* =====================================================================
+   Schema viewer
+   ===================================================================== */
+.schema-viewer {
+  background: #0a0f1a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.schema-viewer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #1e293b;
+  background: #111827;
+}
+
+.schema-viewer__label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+}
+
+.schema-viewer__tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.schema-tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.schema-tab:hover { color: #94a3b8; }
+.schema-tab:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+
+.schema-tab--active {
+  background: #1e293b;
+  border-color: #334155;
+  color: #60a5fa;
+}
+
+.schema-viewer__code {
+  margin: 0;
+  padding: 0.75rem;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Models panel */
+.models-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.models-panel__item {
+  /* Schema viewer handles its own styling */
+}
