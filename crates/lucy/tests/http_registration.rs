@@ -4,7 +4,7 @@
 //! This test lives in the `lucy` crate (not `lucy-macro`) so that `::lucy`
 //! resolves correctly in the code emitted by the proc-macro.
 
-use lucy::lucy_http;
+use lucyd::lucy_http;
 use lucy_core::registry::global_registry;
 
 #[allow(dead_code)]

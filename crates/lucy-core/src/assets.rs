@@ -38,7 +38,7 @@ const UI_NOT_BUILT_MSG: &str = "UI not built";
 /// the inner development loop fast because contributors can iterate
 /// on the Rust runtime without first running the UI toolchain.
 #[derive(RustEmbed)]
-#[folder = "../../ui/dist/"]
+#[folder = "ui/dist/"]
 struct UiAssets;
 
 /// Serves `index.html` directly — used for the `/docs` and `/docs/` root routes

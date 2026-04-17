@@ -14,7 +14,8 @@ export default defineConfig({
   base: '/docs/',
 
   build: {
-    outDir: 'dist',
+    outDir: '../crates/lucy-core/ui/dist',
+    emptyOutDir: true,
   },
   server: {
     proxy: {

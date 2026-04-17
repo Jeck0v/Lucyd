@@ -1,8 +1,12 @@
 [package]
-name    = "lucy-types"
-version.workspace    = true
-edition.workspace    = true
-license.workspace    = true
+name        = "lucy-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared types for lucyd: Protocol, EndpointMeta, JsonSchemaWrapper"
+keywords    = ["axum", "documentation", "types", "websocket", "mqtt"]
+categories  = ["development-tools", "web-programming::http-server"]
+repository.workspace = true
 
 [dependencies]
 serde      = { workspace = true }

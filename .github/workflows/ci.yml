@@ -33,7 +33,7 @@ jobs:
       # rust-embed requires the folder to exist at compile time.
       # In CI we don't run the Node build, so we create an empty stub.
       - name: Create ui/dist stub for rust-embed
-        run: mkdir -p ui/dist
+        run: mkdir -p crates/lucy-core/ui/dist
 
       - name: Format
         run: cargo fmt --all -- --check
@@ -65,7 +65,7 @@ jobs:
 
       # Same stub needed for tests since lucy-core is compiled as a dependency.
       - name: Create ui/dist stub for rust-embed
-        run: mkdir -p ui/dist
+        run: mkdir -p crates/lucy-core/ui/dist
 
       - name: Run tests
         run: cargo test --workspace

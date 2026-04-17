@@ -15,6 +15,9 @@ use std::{
 /// Directory containing the React/Vite frontend, relative to workspace root.
 const UI_DIR: &str = "ui";
 
+/// Output directory for the built UI assets (inside lucy-core for crates.io packaging).
+const UI_DIST_DIR: &str = "crates/lucy-core/ui/dist";
+
 /// The package manager binary used to install and build the frontend.
 const BUILD_CMD: &str = "npm";
 
@@ -77,7 +80,7 @@ fn build_ui(workspace_root: &Path) -> Result<(), String> {
 
     println!(
         "==> UI built successfully. Output: `{}`",
-        ui_dir.join("dist").display()
+        workspace_root.join(UI_DIST_DIR).display()
     );
     Ok(())
 }

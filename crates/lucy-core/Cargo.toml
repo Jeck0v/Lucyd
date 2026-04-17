@@ -1,13 +1,18 @@
 [package]
-name    = "lucy-core"
+name        = "lucy-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Core runtime for lucyd: endpoint registry, spec generation, and docs router"
+keywords    = ["axum", "documentation", "websocket", "mqtt", "router"]
+categories  = ["web-programming::http-server", "development-tools"]
+repository.workspace = true
+include     = ["src/**/*", "ui/dist/**/*", "Cargo.toml"]
 
 [dependencies]
 axum        = { workspace = true }
 tokio       = { workspace = true }
 serde_json  = { workspace = true }
 rust-embed  = { workspace = true }
-lucy-types  = { path = "../lucy-types" }
+lucy-types  = { path = "../lucy-types", version = "0.1.2" }
 inventory   = { workspace = true }

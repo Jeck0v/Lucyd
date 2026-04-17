@@ -1,8 +1,12 @@
 [package]
-name    = "lucy-macro"
+name        = "lucy-macro"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Proc-macros for lucyd: #[lucy_http], #[lucy_ws], #[lucy_mqtt] handler annotations"
+keywords    = ["axum", "proc-macro", "documentation", "websocket", "mqtt"]
+categories  = ["development-tools", "web-programming::http-server"]
+repository.workspace = true
 
 [lib]
 proc-macro = true
@@ -11,8 +15,8 @@ proc-macro = true
 proc-macro2 = { workspace = true }
 syn         = { workspace = true }
 quote       = { workspace = true }
-lucy-types  = { path = "../lucy-types" }
+lucy-types  = { path = "../lucy-types", version = "0.1.2" }
 inventory   = { workspace = true }
 
 [dev-dependencies]
-lucy-core = { path = "../lucy-core" }
+lucy-core = { path = "../lucy-core", version = "0.1.2" }

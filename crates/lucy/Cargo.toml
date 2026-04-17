@@ -1,16 +1,21 @@
 [package]
-name    = "lucy"
+name        = "lucyd"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Auto-generated interactive docs UI for Axum backends: HTTP, WebSocket, and MQTT in one interface  /docs"
+keywords    = ["axum", "documentation", "openapi", "websocket", "mqtt"]
+categories  = ["web-programming::http-server", "development-tools"]
+readme      = "../../README.md"
+repository.workspace = true
 
 [dependencies]
-lucy-core  = { path = "../lucy-core" }
-lucy-macro = { path = "../lucy-macro" }
-lucy-types = { path = "../lucy-types" }
+lucy-core  = { path = "../lucy-core",  version = "0.1.2" }
+lucy-macro = { path = "../lucy-macro", version = "0.1.2" }
+lucy-types = { path = "../lucy-types", version = "0.1.2" }
 inventory  = { workspace = true }
 schemars   = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-lucy-core = { path = "../lucy-core" }
+lucy-core = { path = "../lucy-core", version = "0.1.2" }
