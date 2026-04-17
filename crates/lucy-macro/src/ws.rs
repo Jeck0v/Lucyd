@@ -127,9 +127,9 @@ fn schema_fn_tokens(ty: Option<&syn::Type>) -> proc_macro2::TokenStream {
     match ty {
         Some(t) => quote! {
             ::core::option::Option::Some(|| {
-                ::lucy::_private::serde_json::to_value(
-                    ::lucy::_private::schemars::schema_for!(#t)
-                ).unwrap_or(::lucy::_private::serde_json::Value::Null)
+                ::lucyd::_private::serde_json::to_value(
+                    ::lucyd::_private::schemars::schema_for!(#t)
+                ).unwrap_or(::lucyd::_private::serde_json::Value::Null)
             })
         },
         None => quote! { ::core::option::Option::None },
@@ -170,11 +170,11 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #func
 
-        ::lucy::_private::inventory::submit! {
-            ::lucy::_private::lucy_types::endpoint::EndpointMetaStatic {
+        ::lucyd::_private::inventory::submit! {
+            ::lucyd::_private::lucy_types::endpoint::EndpointMetaStatic {
                 name:              #fn_name,
                 path:              #path,
-                protocol:          ::lucy::_private::lucy_types::endpoint::Protocol::WebSocket,
+                protocol:          ::lucyd::_private::lucy_types::endpoint::Protocol::WebSocket,
                 description:       #description_tokens,
                 method:            ::core::option::Option::None,
                 tags:              #tags_tokens,
