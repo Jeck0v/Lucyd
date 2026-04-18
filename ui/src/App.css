@@ -123,9 +123,6 @@ code, pre, .monospace {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-text-primary);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 
@@ -606,7 +603,9 @@ code, pre, .monospace {
 
 .request-body__textarea {
   width: 100%;
-  min-height: 160px;
+  height: 220px;
+  min-height: 80px;
+  max-height: 480px;
   padding: 0.875rem 1rem;
   background: #f8f9fb;
   border: none;
