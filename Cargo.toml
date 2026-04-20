@@ -10,7 +10,7 @@ members  = [
 exclude = ["ui"]
 
 [workspace.package]
-version     = "0.1.2"
+version     = "0.1.8"
 edition     = "2024"
 license     = "MIT"
 authors     = ["Jeck0v"]
@@ -18,9 +18,9 @@ repository  = "https://github.com/FlipGame-Hetic/Lucy"
 
 [workspace.dependencies]
 # Internal crates, path for local dev, version resolved from crates.io when published
-lucy-types = { path = "crates/lucy-types", version = "0.1.5" }
-lucy-core  = { path = "crates/lucy-core",  version = "0.1.5" }
-lucy-macro = { path = "crates/lucy-macro", version = "0.1.5" }
+lucy-types = { path = "crates/lucy-types", version = "0.1.8" }
+lucy-core  = { path = "crates/lucy-core",  version = "0.1.8" }
+lucy-macro = { path = "crates/lucy-macro", version = "0.1.8" }
 
 # Async runtime
 tokio = { version = "1.44.2", features = ["full"] }

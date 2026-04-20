@@ -302,7 +302,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "lucy-core"
-version = "0.1.2"
+version = "0.1.8"
 dependencies = [
  "axum",
  "inventory",
@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "lucy-macro"
-version = "0.1.2"
+version = "0.1.8"
 dependencies = [
  "inventory",
  "lucy-core",
@@ -326,7 +326,7 @@ dependencies = [
 
 [[package]]
 name = "lucy-types"
-version = "0.1.2"
+version = "0.1.8"
 dependencies = [
  "inventory",
  "schemars",
@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "lucyd"
-version = "0.1.2"
+version = "0.1.8"
 dependencies = [
  "inventory",
  "lucy-core",
