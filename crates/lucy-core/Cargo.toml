@@ -16,3 +16,6 @@ serde_json  = { workspace = true }
 rust-embed  = { workspace = true }
 lucy-types  = { workspace = true }
 inventory   = { workspace = true }
+
+[dev-dependencies]
+jsonschema  = { workspace = true }

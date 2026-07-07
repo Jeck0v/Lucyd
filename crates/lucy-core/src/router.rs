@@ -1,20 +1,23 @@
 //! Axum router wiring for the `/docs` surface.
 //!
-//! The router exposes two things:
+//! The router exposes three things:
 //!
-//! * `GET /docs/spec.json` — the JSON specification generated from the
-//!   global [`EndpointRegistry`]; consumed by the embedded UI.
-//! * `GET /docs/{*path}`   — the embedded Single-Page-Application UI,
+//! * `GET /docs/spec.json`    — the internal JSON specification generated from
+//!   the global [`EndpointRegistry`]; consumed by the embedded UI.
+//! * `GET /docs/openapi.json` — an OpenAPI 3.1 document derived from the same
+//!   registry (HTTP endpoints only) for standard OpenAPI tooling.
+//! * `GET /docs/{*path}`      — the embedded Single-Page-Application UI,
 //!   served from assets compiled into the binary.
 
-use crate::{assets, registry, spec};
-use axum::{routing::get, Router};
+use crate::{assets, openapi, registry, spec};
+use axum::{Router, routing::get};
 
 /// Creates the Axum router that serves the Lucy docs interface.
 ///
 /// Routes:
-/// - `GET /docs/spec.json` — returns the generated endpoint spec
-/// - `GET /docs/{*path}`   — serves embedded UI static assets with
+/// - `GET /docs/spec.json`    — returns the generated internal endpoint spec
+/// - `GET /docs/openapi.json` — returns the generated OpenAPI 3.1 document
+/// - `GET /docs/{*path}`      — serves embedded UI static assets with
 ///   SPA-style fallback to `index.html`
 ///
 /// The function is generic over the host application's state type `S` so it
@@ -37,6 +40,7 @@ where
         .route("/docs", get(assets::serve_index))
         .route("/docs/", get(assets::serve_index))
         .route("/docs/spec.json", get(spec_handler))
+        .route("/docs/openapi.json", get(openapi_handler))
         .route("/docs/{*path}", get(assets::serve_asset))
 }
 
@@ -56,6 +60,21 @@ async fn spec_handler() -> axum::response::Json<serde_json::Value> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     axum::response::Json(spec::generate_spec(&registry))
+}
+
+/// Returns the generated OpenAPI 3.1 document as JSON.
+///
+/// Only `Protocol::Http` endpoints are represented — see [`crate::openapi::generate_openapi_document`].
+///
+/// # Lock poisoning
+/// Like [`spec_handler`], if the registry lock is poisoned we recover the
+/// inner guard via [`PoisonError::into_inner`] rather than propagating a panic
+/// and crashing the Axum worker thread.
+async fn openapi_handler() -> axum::response::Json<serde_json::Value> {
+    let registry = registry::global_registry()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    axum::response::Json(openapi::generate_openapi_document(&registry))
 }
 
 #[cfg(test)]

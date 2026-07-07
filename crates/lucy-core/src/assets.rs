@@ -9,7 +9,7 @@
 use axum::{
     body::Body,
     extract::Path,
-    http::{header::CONTENT_TYPE, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header::CONTENT_TYPE},
     response::{IntoResponse, Response},
 };
 use rust_embed::RustEmbed;
