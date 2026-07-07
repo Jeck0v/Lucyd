@@ -11,6 +11,7 @@
 //! ```
 
 pub mod assets;
+pub mod openapi;
 pub mod registry;
 pub mod router;
 pub mod spec;

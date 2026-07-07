@@ -19,7 +19,7 @@ No external tools required. Annotate your handlers, run your server, open your b
 ```toml
 # Cargo.toml
 [dependencies]
-lucyd   = "0.1.8"
+lucyd   = "0.1.9"
 schemars = "0.8"
 serde    = { version = "1", features = ["derive"] }
 axum     = "0.8"
@@ -63,7 +63,7 @@ async fn main() {
     // Build the UI bundle once before running: cargo xtask build-ui
     let app = Router::new()
         .route("/api/ping", post(ping))
-        .merge(docs_router()); // serves /docs and /docs/spec.json
+        .merge(docs_router()); // serves /docs, /docs/spec.json and /docs/openapi.json
 
     axum::serve(
         tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap(),
@@ -73,6 +73,26 @@ async fn main() {
     .unwrap();
 }
 ```
+
+## Try it locally
+
+A runnable example lives in `crates/lucy/examples/demo.rs`: it wires up `#[lucy_http]`, `#[lucy_ws]`, and `#[lucy_mqtt]` together with `docs_router()`, so you can exercise the whole pipeline without writing any code of your own.
+
+```bash
+cargo run --example demo -p lucyd
+```
+
+Then, in another terminal:
+
+```bash
+curl http://localhost:3000/docs/openapi.json                 # generated OpenAPI 3.1 document
+curl http://localhost:3000/docs/spec.json                    # internal spec, all protocols
+curl -X POST http://localhost:3000/api/ping \
+  -H "Content-Type: application/json" \
+  -d '{"message":"hello"}'                                   # real handler round-trip
+```
+
+Or open [http://localhost:3000/docs](http://localhost:3000/docs) in a browser for the interactive UI.
 
 ## Macros
 
