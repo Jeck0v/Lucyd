@@ -19,3 +19,6 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 lucy-core = { workspace = true }
+axum      = { workspace = true, features = ["ws"] }
+tokio     = { workspace = true }
+serde     = { workspace = true }

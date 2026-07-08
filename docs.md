@@ -15,11 +15,12 @@ It is designed for [Axum](https://github.com/tokio-rs/axum) backends and require
    - [`#[lucy_mqtt]`](#lucy_mqtt)
 4. [JSON Schema generation](#4-json-schema-generation)
 5. [The spec format](#5-the-spec-format)
-6. [Building the UI](#6-building-the-ui)
-7. [UI features](#7-ui-features)
-8. [Full example](#8-full-example)
-9. [Architecture overview](#9-architecture-overview)
-10. [Known limitations (v0.1)](#10-known-limitations-v01)
+6. [The OpenAPI export (`/docs/openapi.json`)](#6-the-openapi-export-docsopenapijson)
+7. [Building the UI](#7-building-the-ui)
+8. [UI features](#8-ui-features)
+9. [Full example](#9-full-example)
+10. [Architecture overview](#10-architecture-overview)
+11. [Known limitations (v0.1)](#11-known-limitations-v01)
 
 ---
 
@@ -70,6 +71,7 @@ Then open **`http://localhost:3000/docs`** in your browser.
 > `docs_router()` registers:
 > - `GET /docs` and `GET /docs/`: the embedded React UI (SPA)
 > - `GET /docs/spec.json`: the machine-readable endpoint catalogue
+> - `GET /docs/openapi.json`: an OpenAPI 3.1 document for standard tooling (HTTP endpoints only)
 > - `GET /docs/*path`: static assets (JS, CSS) embedded in the binary
 
 ---
@@ -333,6 +335,84 @@ GET /docs/spec.json
 
 ---
 
+## 6. The OpenAPI export (`/docs/openapi.json`)
+
+Alongside the internal `/docs/spec.json`, Lucy exposes an **OpenAPI 3.1** document at:
+
+```
+GET /docs/openapi.json
+```
+
+This is a **derived, additive** view of the exact same endpoint registry that backs `/docs/spec.json`. The internal spec remains the source of truth and is left completely unchanged; the OpenAPI document is generated purely for interoperability with standard OpenAPI tooling — Swagger UI, [`openapi-generator`](https://openapi-generator.tech/), [`orval`](https://orval.dev/), Postman import, and so on.
+
+**Scope: HTTP endpoints only.** Only `#[lucy_http]` endpoints appear in `paths`. `#[lucy_ws]` and `#[lucy_mqtt]` endpoints are entirely absent from the exported document — not simplified, not listed under a placeholder entry, absent.
+
+**Why.** OpenAPI 3.1 has no native object for a WebSocket upgrade or an MQTT topic. Two designs were considered:
+
+1. Preserve them anyway, attached to a Path Item as vendor extensions (`x-lucyd-ws` / `x-lucyd-mqtt`) — valid OpenAPI (the spec explicitly allows `x-*` extension fields anywhere), so no metadata is silently lost.
+2. Omit them from this export entirely and keep `/docs/spec.json` as the single, protocol-agnostic source of truth; a future, separate `/docs/asyncapi.json` export would cover WebSocket/MQTT properly using the [AsyncAPI](https://www.asyncapi.com/) standard instead.
+
+**This version implements (2).** Option (1) is not implemented — it's a possible future addition, not a bug or an oversight. If you need WebSocket or MQTT metadata today, read it from `/docs/spec.json` instead: it is unaffected by this scoping and lists every registered endpoint regardless of protocol (see [§5](#5-the-spec-format)).
+
+**Response shape** (abbreviated)
+
+```json
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Lucyd API", "version": "0.1.9" },
+  "paths": {
+    "/api/users": {
+      "post": {
+        "operationId": "create_user",
+        "description": "Create a new user account",
+        "tags": ["users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUserRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateUserRequest": { "type": "object", "properties": { "name": { "type": "string" } } },
+      "User": { "type": "object", "properties": { "id": { "type": "integer" } } }
+    }
+  }
+}
+```
+
+- **Schema hoisting & naming.** Every request/response JSON Schema is hoisted into `components.schemas` and referenced with `$ref`. Each schema is named after its `title` (falling back to `{endpoint}_request` / `{endpoint}_response` when no title is present), and identical schemas are de-duplicated document-wide; conflicting schemas that share a name are suffixed (`Name_2`, `Name_3`, ...).
+- **`info` defaults.** `info.title` and `info.version` currently default to fixed values (`"Lucyd API"` and the crate's own version). They are not yet user-configurable.
+- **No security schemes.** Lucy carries no auth metadata in its endpoint registry today, so `components.securitySchemes` and operation-level `security` are always omitted (no placeholder data is invented).
+
+**Verify with real tooling**
+
+```bash
+curl -s http://localhost:8080/docs/openapi.json -o /tmp/lucyd-openapi.json
+npx @openapitools/openapi-generator-cli generate -i /tmp/lucyd-openapi.json -g typescript-fetch -o /tmp/lucyd-client
+npx orval --input /tmp/lucyd-openapi.json --output /tmp/lucyd-orval-out
+```
+
+---
+
+## 7. Building the UI
+
+The interactive `/docs` UI is a React single-page app bundled into the binary at compile time. Build it once with `cargo xtask build-ui` before compiling `lucy-core` for a production profile.
 
 **CI / Docker**
 
@@ -348,7 +428,7 @@ An empty `ui/dist/` satisfies `rust-embed` at compile time. The binary will resp
 
 ---
 
-## . UI features
+## 8. UI features
 
 The Lucy UI at `/docs` is an interactive API explorer similar to Swagger UI.
 
@@ -393,7 +473,7 @@ Lists all unique JSON Schemas collected from `request_schema` and `response_sche
 
 ---
 
-## 8. Full example
+## 9. Full example
 
 ```rust
 // src/main.rs
@@ -506,7 +586,7 @@ async fn main() {
 
 ---
 
-## 9. Architecture overview
+## 10. Architecture overview
 
 ```
 your-axum-app
@@ -555,7 +635,7 @@ Macro-generated code references `::lucy::_private::*` so consumer crates only ne
 
 ---
 
-## 10. Known limitations (v0.1)
+## 11. Known limitations (v0.1)
 
 | Limitation | Status |
 |---|---|
@@ -563,3 +643,6 @@ Macro-generated code references `::lucy::_private::*` so consumer crates only ne
 | **Single global registry**  one `EndpointRegistry` per process; two Lucy-using libraries in the same binary share the same doc surface. | By design |
 | **No WebSocket schema**  `request` / `response` schema arguments are only supported on `#[lucy_http]`. WebSocket message schemas are not yet generated. | Planned |
 | **MQTT broker URL is user-defined in the UI** as `ws://localhost:9001` by default  update it manually if the broker runs elsewhere. | Planned |
+| **OpenAPI export is HTTP-only** — `#[lucy_ws]`/`#[lucy_mqtt]` endpoints are entirely absent from `/docs/openapi.json`, not represented via vendor extensions either (see [§6](#6-the-openapi-export-docsopenapijson)). Use `/docs/spec.json` for complete, protocol-agnostic metadata in the meantime. | By design (v0.1); vendor-extension preservation is a possible future addition |
+| **No security schemes in OpenAPI export** — `EndpointMeta` carries no auth metadata today, so `components.securitySchemes` / operation `security` are always omitted (correctly — there is nothing to export, not a dropped field). | Planned |
+| **Axum catch-all path segments (`{*name}`) get no OpenAPI parameter** — OpenAPI's path templating has no wildcard/remainder-of-path equivalent, so such segments are silently omitted from `parameters` rather than emitting an invalid entry. | By design |

@@ -4,12 +4,14 @@
 //! function along with an `inventory::submit!` block that registers the
 //! endpoint in the global [`EndpointRegistry`] at link time.
 
+use crate::common;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
+    Ident, ItemFn, LitStr, Token,
     parse::{Parse, ParseStream},
-    parse_macro_input, Ident, ItemFn, LitStr, Token,
+    parse_macro_input,
 };
 
 /// Parsed arguments for the `#[lucy_mqtt(...)]` attribute.
@@ -26,113 +28,61 @@ pub struct MqttArgs {
     pub response_type: Option<syn::Type>,
 }
 
-impl Parse for MqttArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        // Accumulators for each supported key; `Option` lets us detect missing
-        // required keys and duplicate assignments.
-        let mut topic: Option<LitStr> = None;
-        let mut description: Option<LitStr> = None;
-        let mut tags: Option<LitStr> = None;
-        let mut request_type: Option<syn::Type> = None;
-        let mut response_type: Option<syn::Type> = None;
+/// Accumulator for `#[lucy_mqtt(...)]` arguments as they're parsed.
+///
+/// Fields are `Option` so [`Parse::parse`] can detect both missing required
+/// keys and duplicate assignments before handing off to [`RawMqttArgs::finalize`].
+#[derive(Default)]
+struct RawMqttArgs {
+    topic: Option<LitStr>,
+    description: Option<LitStr>,
+    tags: Option<LitStr>,
+    request_type: Option<syn::Type>,
+    response_type: Option<syn::Type>,
+}
 
-        // Parse a comma-separated list of `key = value` pairs.
-        while !input.is_empty() {
-            let key: Ident = input.parse()?;
-            let _eq: Token![=] = input.parse()?;
-
-            match key.to_string().as_str() {
-                "topic" => {
-                    if topic.is_some() {
-                        return Err(syn::Error::new_spanned(&key, "duplicate `topic` argument"));
-                    }
-                    topic = Some(input.parse::<LitStr>()?);
-                }
-                "description" => {
-                    if description.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `description` argument",
-                        ));
-                    }
-                    description = Some(input.parse::<LitStr>()?);
-                }
-                "tags" => {
-                    if tags.is_some() {
-                        return Err(syn::Error::new_spanned(&key, "duplicate `tags` argument"));
-                    }
-                    tags = Some(input.parse::<LitStr>()?);
-                }
-                "request" => {
-                    if request_type.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `request` argument",
-                        ));
-                    }
-                    request_type = Some(input.parse::<syn::Type>()?);
-                }
-                "response" => {
-                    if response_type.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `response` argument",
-                        ));
-                    }
-                    response_type = Some(input.parse::<syn::Type>()?);
-                }
-                other => {
-                    return Err(syn::Error::new_spanned(
-                        &key,
-                        format!(
-                            "unknown argument `{other}`; expected one of: topic, description, tags, request, response"
-                        ),
-                    ));
-                }
-            }
-
-            // Consume a trailing comma if present; otherwise we're done.
-            if input.is_empty() {
-                break;
-            }
-            let _comma: Token![,] = input.parse()?;
-        }
-
-        let topic = topic
-            .ok_or_else(|| syn::Error::new(input.span(), "missing required `topic` argument"))?;
-
-        let tags_vec: Vec<String> = tags
-            .map(|t| {
-                t.value()
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default();
+impl RawMqttArgs {
+    /// Validates required keys and converts raw tokens into [`MqttArgs`].
+    fn finalize(self, span: Span) -> syn::Result<MqttArgs> {
+        let topic = common::require(self.topic, "topic", span)?;
 
         Ok(MqttArgs {
             topic: topic.value(),
-            description: description.map(|d| d.value()),
-            tags: tags_vec,
-            request_type,
-            response_type,
+            description: self.description.map(|d| d.value()),
+            tags: common::parse_tags(self.tags),
+            request_type: self.request_type,
+            response_type: self.response_type,
         })
     }
 }
 
-/// Generates tokens for a schema fn pointer field.
-fn schema_fn_tokens(ty: Option<&syn::Type>) -> proc_macro2::TokenStream {
-    match ty {
-        Some(t) => quote! {
-            ::core::option::Option::Some(|| {
-                ::lucyd::_private::serde_json::to_value(
-                    ::lucyd::_private::schemars::schema_for!(#t)
-                ).unwrap_or(::lucyd::_private::serde_json::Value::Null)
-            })
-        },
-        None => quote! { ::core::option::Option::None },
+impl Parse for MqttArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut raw = RawMqttArgs::default();
+
+        // Parse a comma-separated list of `key = value` pairs.
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+            input.parse::<Token![=]>()?;
+
+            match key.to_string().as_str() {
+                "topic" => common::parse_unique(&key, &mut raw.topic, input)?,
+                "description" => common::parse_unique(&key, &mut raw.description, input)?,
+                "tags" => common::parse_unique(&key, &mut raw.tags, input)?,
+                "request" => common::parse_unique(&key, &mut raw.request_type, input)?,
+                "response" => common::parse_unique(&key, &mut raw.response_type, input)?,
+                _ => {
+                    return Err(common::unknown_argument_error(
+                        &key,
+                        "topic, description, tags, request, response",
+                    ));
+                }
+            }
+
+            common::consume_trailing_comma(input)?;
+        }
+
+        raw.finalize(input.span())
     }
 }
 
@@ -148,24 +98,10 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = func.sig.ident.to_string();
     let topic = &args.topic; // stored in the `path` field
 
-    let description_tokens = match &args.description {
-        Some(desc) => quote! { ::core::option::Option::Some(#desc) },
-        None => quote! { ::core::option::Option::None },
-    };
-
-    let tag_lits: Vec<LitStr> = args
-        .tags
-        .iter()
-        .map(|t| LitStr::new(t, Span::call_site()))
-        .collect();
-    let tags_tokens = if tag_lits.is_empty() {
-        quote! { &[] }
-    } else {
-        quote! { &[#(#tag_lits),*] }
-    };
-
-    let request_schema_tokens = schema_fn_tokens(args.request_type.as_ref());
-    let response_schema_tokens = schema_fn_tokens(args.response_type.as_ref());
+    let description_tokens = common::option_str_tokens(args.description.as_deref());
+    let tags_tokens = common::tags_tokens(&args.tags);
+    let request_schema_tokens = common::schema_fn_tokens(args.request_type.as_ref());
+    let response_schema_tokens = common::schema_fn_tokens(args.response_type.as_ref());
 
     let expanded = quote! {
         #func

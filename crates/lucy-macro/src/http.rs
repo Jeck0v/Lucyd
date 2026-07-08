@@ -4,12 +4,14 @@
 //! function along with an `inventory::submit!` block that registers the
 //! endpoint in the global [`EndpointRegistry`] at link time.
 
+use crate::common;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
+    Ident, ItemFn, LitStr, Token,
     parse::{Parse, ParseStream},
-    parse_macro_input, Ident, ItemFn, LitStr, Token,
+    parse_macro_input,
 };
 
 /// Parsed arguments for the `#[lucy_http(...)]` attribute.
@@ -28,111 +30,67 @@ pub struct HttpArgs {
     pub response_type: Option<syn::Type>,
 }
 
+/// Accumulator for `#[lucy_http(...)]` arguments as they're parsed.
+///
+/// Fields are `Option` so [`Parse::parse`] can detect both missing required
+/// keys and duplicate assignments before handing off to [`RawHttpArgs::finalize`].
+#[derive(Default)]
+struct RawHttpArgs {
+    method: Option<LitStr>,
+    path: Option<LitStr>,
+    description: Option<LitStr>,
+    tags: Option<LitStr>,
+    request_type: Option<syn::Type>,
+    response_type: Option<syn::Type>,
+}
+
+impl RawHttpArgs {
+    /// Validates required keys and converts raw tokens into [`HttpArgs`].
+    fn finalize(self, span: Span) -> syn::Result<HttpArgs> {
+        let method = common::require(self.method, "method", span)?;
+        let path = common::require(self.path, "path", span)?;
+
+        Ok(HttpArgs {
+            method: method.value(),
+            path: path.value(),
+            description: self.description.map(|d| d.value()),
+            tags: common::parse_tags(self.tags),
+            request_type: self.request_type,
+            response_type: self.response_type,
+        })
+    }
+}
+
 impl Parse for HttpArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // Accumulators for each supported key. We keep them as `Option` so we
-        // can detect both missing required keys and duplicate assignments.
-        let mut method: Option<LitStr> = None;
-        let mut path: Option<LitStr> = None;
-        let mut description: Option<LitStr> = None;
-        let mut tags: Option<LitStr> = None;
-        let mut request_type: Option<syn::Type> = None;
-        let mut response_type: Option<syn::Type> = None;
+        let mut raw = RawHttpArgs::default();
 
         // Parse a comma-separated list of `key = value` pairs.
         // String arguments use `"value"`, while `request` and `response`
         // accept a bare type path (e.g. `MyStruct`).
         while !input.is_empty() {
             let key: Ident = input.parse()?;
-            let _eq: Token![=] = input.parse()?;
+            input.parse::<Token![=]>()?;
 
             match key.to_string().as_str() {
-                "method" => {
-                    if method.is_some() {
-                        return Err(syn::Error::new_spanned(&key, "duplicate `method` argument"));
-                    }
-                    method = Some(input.parse::<LitStr>()?);
-                }
-                "path" => {
-                    if path.is_some() {
-                        return Err(syn::Error::new_spanned(&key, "duplicate `path` argument"));
-                    }
-                    path = Some(input.parse::<LitStr>()?);
-                }
-                "description" => {
-                    if description.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `description` argument",
-                        ));
-                    }
-                    description = Some(input.parse::<LitStr>()?);
-                }
-                "tags" => {
-                    if tags.is_some() {
-                        return Err(syn::Error::new_spanned(&key, "duplicate `tags` argument"));
-                    }
-                    tags = Some(input.parse::<LitStr>()?);
-                }
-                "request" => {
-                    if request_type.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `request` argument",
-                        ));
-                    }
-                    request_type = Some(input.parse::<syn::Type>()?);
-                }
-                "response" => {
-                    if response_type.is_some() {
-                        return Err(syn::Error::new_spanned(
-                            &key,
-                            "duplicate `response` argument",
-                        ));
-                    }
-                    response_type = Some(input.parse::<syn::Type>()?);
-                }
-                other => {
-                    return Err(syn::Error::new_spanned(
+                "method" => common::parse_unique(&key, &mut raw.method, input)?,
+                "path" => common::parse_unique(&key, &mut raw.path, input)?,
+                "description" => common::parse_unique(&key, &mut raw.description, input)?,
+                "tags" => common::parse_unique(&key, &mut raw.tags, input)?,
+                "request" => common::parse_unique(&key, &mut raw.request_type, input)?,
+                "response" => common::parse_unique(&key, &mut raw.response_type, input)?,
+                _ => {
+                    return Err(common::unknown_argument_error(
                         &key,
-                        format!(
-                            "unknown argument `{other}`; expected one of: method, path, description, tags, request, response"
-                        ),
+                        "method, path, description, tags, request, response",
                     ));
                 }
             }
 
-            // Consume a trailing comma if present; otherwise we're done.
-            if input.is_empty() {
-                break;
-            }
-            let _comma: Token![,] = input.parse()?;
+            common::consume_trailing_comma(input)?;
         }
 
-        let method = method
-            .ok_or_else(|| syn::Error::new(input.span(), "missing required `method` argument"))?;
-        let path =
-            path.ok_or_else(|| syn::Error::new(input.span(), "missing required `path` argument"))?;
-
-        let tags_vec: Vec<String> = tags
-            .map(|t| {
-                t.value()
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        Ok(HttpArgs {
-            method: method.value(),
-            path: path.value(),
-            description: description.map(|d| d.value()),
-            tags: tags_vec,
-            request_type,
-            response_type,
-        })
+        raw.finalize(input.span())
     }
 }
 
@@ -141,22 +99,6 @@ impl Parse for HttpArgs {
 /// Parses the attribute arguments, validates them, and emits the original
 /// function together with an `inventory::submit!` block that registers the
 /// endpoint metadata at link time.
-/// Generates tokens for a schema fn pointer field (`request_schema_fn` or
-/// `response_schema_fn`).  When the user supplied a type, we emit a closure
-/// that calls `schemars::schema_for!` at runtime; otherwise we emit `None`.
-fn schema_fn_tokens(ty: Option<&syn::Type>) -> proc_macro2::TokenStream {
-    match ty {
-        Some(t) => quote! {
-            ::core::option::Option::Some(|| {
-                ::lucyd::_private::serde_json::to_value(
-                    ::lucyd::_private::schemars::schema_for!(#t)
-                ).unwrap_or(::lucyd::_private::serde_json::Value::Null)
-            })
-        },
-        None => quote! { ::core::option::Option::None },
-    }
-}
-
 pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as HttpArgs);
     let func = parse_macro_input!(item as ItemFn);
@@ -165,24 +107,10 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
     let path = &args.path;
     let method = &args.method;
 
-    let description_tokens = match &args.description {
-        Some(desc) => quote! { ::core::option::Option::Some(#desc) },
-        None => quote! { ::core::option::Option::None },
-    };
-
-    let tag_lits: Vec<LitStr> = args
-        .tags
-        .iter()
-        .map(|t| LitStr::new(t, Span::call_site()))
-        .collect();
-    let tags_tokens = if tag_lits.is_empty() {
-        quote! { &[] }
-    } else {
-        quote! { &[#(#tag_lits),*] }
-    };
-
-    let request_schema_tokens = schema_fn_tokens(args.request_type.as_ref());
-    let response_schema_tokens = schema_fn_tokens(args.response_type.as_ref());
+    let description_tokens = common::option_str_tokens(args.description.as_deref());
+    let tags_tokens = common::tags_tokens(&args.tags);
+    let request_schema_tokens = common::schema_fn_tokens(args.request_type.as_ref());
+    let response_schema_tokens = common::schema_fn_tokens(args.response_type.as_ref());
 
     let expanded = quote! {
         #func

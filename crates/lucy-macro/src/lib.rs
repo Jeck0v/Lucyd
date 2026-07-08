@@ -13,6 +13,7 @@
 
 use proc_macro::TokenStream;
 
+mod common;
 mod http;
 mod mqtt;
 mod ws;
