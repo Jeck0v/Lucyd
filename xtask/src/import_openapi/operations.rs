@@ -253,15 +253,11 @@ fn collect_parameters(
                 continue;
             }
             match resolved.get("in").and_then(Value::as_str) {
-                Some("path") => {
-                    if seen_path.insert(name.clone()) {
-                        path_params.push(name);
-                    }
+                Some("path") if seen_path.insert(name.clone()) => {
+                    path_params.push(name);
                 }
-                Some("query") => {
-                    if seen_query.insert(name.clone()) {
-                        query_params.push(name);
-                    }
+                Some("query") if seen_query.insert(name.clone()) => {
+                    query_params.push(name);
                 }
                 _ => {}
             }
