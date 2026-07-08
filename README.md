@@ -110,14 +110,14 @@ Or open [http://localhost:3000/docs](http://localhost:3000/docs) in a browser fo
 | `lucy-macro` | Proc-macros: parse `#[lucy_*]` attributes, emit `inventory::submit!` |
 | `lucy-core`  | Runtime: global registry, spec generation, Axum router, asset serving |
 | `lucy-types` | Shared types: `Protocol`, `EndpointMeta`, `EndpointMetaStatic` |
-| `xtask`      | Build tooling: `cargo xtask build-ui` |
+| `xtask`      | Build tooling: `cargo xtask build-ui`, `cargo xtask import-openapi` |
 
 ## Documentation
 
 Full usage guide, all macro arguments, spec format, architecture details:
 
 ```
-docs.md
+docs/README.md
 ```
 
 Rust API documentation:
