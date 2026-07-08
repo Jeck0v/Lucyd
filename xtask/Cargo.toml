@@ -4,6 +4,34 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[lib]
+name = "xtask"
+path = "src/lib.rs"
+
 [[bin]]
 name = "xtask"
 path = "src/main.rs"
+
+[dependencies]
+# Reused for both parsing an existing generated file (to merge into) and
+# emitting the new one; workspace-pinned so they stay in lockstep with the
+# versions lucy-macro already builds against.
+syn         = { workspace = true }
+quote       = { workspace = true }
+proc-macro2 = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+
+# Not added to [workspace.dependencies]: that section is reserved for the
+# four published crates, and xtask is the only crate that needs these two.
+#
+# Maintained fork of the archived `serde_yaml`; deserializes straight into
+# `serde_json::Value` (which implements `Deserialize`) so YAML and JSON OpenAPI
+# documents flow through the exact same in-memory representation.
+serde_yaml_ng = "0.10"
+# Formats the generated `syn::File` back into readable source without
+# shelling out to `rustfmt`.
+prettyplease  = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

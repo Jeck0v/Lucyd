@@ -166,8 +166,8 @@ fn unique_operation_id(base: &str, used: &mut HashSet<String>) -> String {
 /// `{na{me}`) and axum's `{*name}` catch-all syntax are skipped rather than
 /// emitting an invalid or misleading Parameter Object — OpenAPI's path
 /// templating has no equivalent to a wildcard remainder-of-path match, so a
-/// catch-all segment is a known, undocumented gap (see `docs.md`'s "Known
-/// limitations" table) rather than something we can represent faithfully.
+/// catch-all segment is a known, undocumented gap (see `docs/11-limitations.md`)
+/// rather than something we can represent faithfully.
 fn path_parameters(path: &str) -> Vec<Value> {
     path.split('/')
         .filter_map(|segment| {
