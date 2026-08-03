@@ -6,6 +6,12 @@
 //! - http://localhost:3000/docs/spec.json
 //! - POST http://localhost:3000/api/ping
 //! - GET  http://localhost:3000/api/scores?board=main&limit=5
+//!
+//! The MQTT panel needs a broker speaking WebSocket. One is served from this
+//! same process (see [`mqtt_broker`]), so point the panel's Broker field at
+//! `ws://localhost:3000/mqtt` — no external broker, no second port.
+
+mod mqtt_broker;
 
 use axum::{
     Router,
@@ -17,8 +23,11 @@ use axum::{
     routing::{get, post},
 };
 use lucyd::{docs_router, lucyd_http, lucyd_mqtt, lucyd_ws};
+use mqtt_broker::Publication;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::sync::broadcast::Sender;
 
 #[derive(Deserialize, JsonSchema)]
 pub struct Ping {
@@ -133,17 +142,43 @@ async fn on_temp() {
     println!("on_temp handler ran (would normally fire on an MQTT message)");
 }
 
+/// Publishes a reading every two seconds, so the MQTT panel shows a live feed
+/// with no sensor attached.
+///
+/// It goes onto the same bus a connected client publishes to, which is why the
+/// panel sees it simply by subscribing to `sensors/temperature`.
+async fn publish_readings(bus: Sender<Publication>) {
+    let mut ticker = tokio::time::interval(Duration::from_secs(2));
+    for tick in 0u32.. {
+        ticker.tick().await;
+        let celsius = 20.0 + f64::from(tick % 40) / 10.0;
+        // Fails only while nobody is subscribed, which is not an error here.
+        let _ = bus.send(Publication::new(
+            "sensors/temperature",
+            format!("{{\"celsius\":{celsius:.1}}}"),
+        ));
+    }
+}
+
 #[tokio::main]
 async fn main() {
     on_temp().await;
+
+    let bus = mqtt_broker::bus();
+    tokio::spawn(publish_readings(bus.clone()));
 
     let app = Router::new()
         .route("/api/ping", post(ping))
         .route("/api/scores", get(scores))
         .route("/ws/events", get(events))
+        .merge(mqtt_broker::router(bus))
         .merge(docs_router());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("listening on http://localhost:3000  (try /docs, /docs/openapi.json)");
+    println!(
+        "MQTT panel  -> set Broker to ws://localhost:3000{}",
+        mqtt_broker::PATH
+    );
     axum::serve(listener, app).await.unwrap();
 }
