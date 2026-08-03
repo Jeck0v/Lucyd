@@ -13,12 +13,20 @@
 //! Only [`Protocol::Http`] endpoints are represented. `WebSocket` and `Mqtt`
 //! endpoints are intentionally excluded — OpenAPI 3.1 has no native way to
 //! describe them; a separate future AsyncAPI export will cover those.
+//!
+//! # Validating a migration
+//!
+//! The `diff` module (behind the `openapi-diff` feature) compares a
+//! pre-existing OpenAPI document against the one generated here, so a project
+//! moving onto Lucyd can prove no endpoint or contract detail was lost.
 
 use crate::registry::EndpointRegistry;
 use components::ComponentSchemas;
 use serde_json::{Map, Value, json};
 
 mod components;
+#[cfg(feature = "openapi-diff")]
+pub mod diff;
 mod paths;
 mod refs;
 #[cfg(test)]

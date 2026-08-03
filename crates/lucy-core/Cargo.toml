@@ -9,6 +9,12 @@ categories  = ["web-programming::http-server", "development-tools"]
 repository.workspace = true
 include     = ["src/**/*", "ui/dist/**/*", "Cargo.toml"]
 
+[features]
+# Compares an existing OpenAPI document against the one Lucyd generates.
+# Off by default: it is a migration/CI concern, not a runtime one, so an
+# application that only serves `/docs` never compiles it.
+openapi-diff = []
+
 [dependencies]
 axum        = { workspace = true }
 tokio       = { workspace = true }
