@@ -15,7 +15,7 @@ path = "src/main.rs"
 [dependencies]
 # Reused for both parsing an existing generated file (to merge into) and
 # emitting the new one; workspace-pinned so they stay in lockstep with the
-# versions lucy-macro already builds against.
+# versions lucyd-macro already builds against.
 syn         = { workspace = true }
 quote       = { workspace = true }
 proc-macro2 = { workspace = true }

@@ -1,0 +1,28 @@
+[package]
+name        = "lucyd-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Command-line companion to lucyd: compares an existing OpenAPI document against the one a Lucyd application generates"
+keywords    = ["openapi", "diff", "cli", "migration", "api"]
+categories  = ["command-line-utilities", "development-tools"]
+readme      = "README.md"
+repository.workspace = true
+include     = ["src/**/*", "README.md", "Cargo.toml"]
+
+# The crate is `lucyd-cli` because `lucyd` is already the library facade on
+# crates.io; the binary it installs is what users type, and that is `lucyd`.
+[[bin]]
+name = "lucyd"
+path = "src/main.rs"
+
+[dependencies]
+# The diff itself lives in lucyd-core, behind the feature this binary exists to
+# expose. Nothing in this crate decides what counts as a difference.
+lucyd-core    = { workspace = true, features = ["openapi-diff"] }
+serde_json    = { workspace = true }
+serde_yaml_ng = { workspace = true }
+clap          = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

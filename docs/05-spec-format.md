@@ -2,7 +2,7 @@
 
 # 5. The spec format
 
-Lucy exposes a machine-readable catalogue of all annotated endpoints at:
+Lucyd exposes a machine-readable catalogue of all annotated endpoints at:
 
 ```
 GET /docs/spec.json
@@ -46,9 +46,9 @@ GET /docs/spec.json
 
 | Value         | Set by         |
 |---------------|----------------|
-| `"Http"`      | `#[lucy_http]` |
-| `"WebSocket"` | `#[lucy_ws]`   |
-| `"Mqtt"`      | `#[lucy_mqtt]` |
+| `"Http"`      | `#[lucyd_http]` |
+| `"WebSocket"` | `#[lucyd_ws]`   |
+| `"Mqtt"`      | `#[lucyd_mqtt]` |
 
 **Optional fields** are absent from the JSON when not provided (no `null` emitted):
 

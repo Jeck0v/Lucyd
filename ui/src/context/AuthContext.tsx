@@ -1,5 +1,5 @@
 /**
- * AuthContext — global authentication state for Lucy.
+ * AuthContext — global authentication state for Lucyd.
  *
  * Persists the selected auth type and credentials to `localStorage` so the
  * user does not have to re-enter them on page reload.

@@ -1,4 +1,4 @@
-# Cargo aliases for Lucy development workflow
+# Cargo aliases for Lucyd development workflow
 [alias]
 # Run: cargo xtask <command>
 xtask = "run --package xtask --"

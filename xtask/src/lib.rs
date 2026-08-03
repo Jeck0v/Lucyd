@@ -1,4 +1,4 @@
-//! Lucy build automation scripts.
+//! Lucyd build automation scripts.
 //!
 //! This crate backs the `xtask` binary (`src/main.rs`, a thin `env::args()`
 //! dispatcher) with a testable library. Keeping the logic here rather than in
@@ -7,12 +7,16 @@
 //! subprocess.
 //!
 //! Available commands:
-//!   build-ui         — Installs npm dependencies and compiles the React
-//!                       frontend into `ui/dist/` for embedding in lucy-core.
-//!   import-openapi    — Reads an OpenAPI 3.x document and generates/merges
-//!                       Rust scaffolding (structs + `#[lucy_http]` stubs).
+//!   build-ui          Installs npm dependencies and compiles the React
+//!                     frontend into `ui/dist/` for embedding in lucyd-core.
+//!   build-docs        Rebuilds `docs.md` from the numbered pages in `docs/`.
+//!   import-openapi    Reads an OpenAPI 3.x document and generates/merges
+//!                     Rust scaffolding (structs + `#[lucyd_http]` stubs).
 
+mod build_docs;
 pub mod import_openapi;
+
+pub use build_docs::build_docs;
 
 use std::{
     env,
@@ -23,8 +27,8 @@ use std::{
 /// Directory containing the React/Vite frontend, relative to workspace root.
 const UI_DIR: &str = "ui";
 
-/// Output directory for the built UI assets (inside lucy-core for crates.io packaging).
-const UI_DIST_DIR: &str = "crates/lucy-core/ui/dist";
+/// Output directory for the built UI assets (inside lucyd-core for crates.io packaging).
+const UI_DIST_DIR: &str = "crates/lucyd-core/ui/dist";
 
 /// The package manager binary used to install and build the frontend.
 const BUILD_CMD: &str = "npm";
@@ -95,6 +99,9 @@ pub fn print_usage() {
     println!("Commands:");
     println!(
         "  build-ui                                    Compile the React frontend into ui/dist/"
+    );
+    println!(
+        "  build-docs                                  Rebuild docs.md from the pages in docs/"
     );
     println!(
         "  import-openapi <file> [--out <path>] [--remove-orphaned]   Generate Rust scaffolding from an OpenAPI 3.x document"

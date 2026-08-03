@@ -6,14 +6,14 @@ Merge `docs_router()` into your Axum application that is the only wiring require
 
 ```rust
 use axum::Router;
-use lucy::docs_router;
+use lucyd::docs_router;
 
 #[tokio::main]
 async fn main() {
     let app = Router::new()
         // your existing routes
         .route("/health", axum::routing::get(health_handler))
-        // Lucy: serves /docs and /docs/spec.json
+        // Lucyd: serves /docs and /docs/spec.json
         .merge(docs_router());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")

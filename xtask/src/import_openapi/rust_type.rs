@@ -1,7 +1,7 @@
 //! Maps JSON Schema objects (as found inside an OpenAPI document) to Rust
 //! types, emitting `struct`/`enum` definitions as it goes.
 //!
-//! This is the inverse of `crates/lucy-core/src/openapi/components.rs`: that
+//! This is the inverse of `crates/lucyd-core/src/openapi/components.rs`: that
 //! module flattens schemars' draft-07 `definitions` into a de-duplicated
 //! `components.schemas` map; [`TypeGenerator`] walks the same kind of shape
 //! in the opposite direction, turning a `components.schemas` entry (or an

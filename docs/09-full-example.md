@@ -7,7 +7,7 @@ A complete `main.rs` using all three macros: HTTP, WebSocket, and MQTT together.
 ```rust
 // src/main.rs
 use axum::{routing::get, Router};
-use lucy::{docs_router, lucy_http, lucy_mqtt, lucy_ws};
+use lucyd::{docs_router, lucyd_http, lucyd_mqtt, lucyd_ws};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -28,7 +28,7 @@ pub struct SceneObject {
 
 // HTTP
 
-#[lucy_http(
+#[lucyd_http(
     method      = "GET",
     path        = "/health",
     tags        = "system",
@@ -38,7 +38,7 @@ async fn health() -> &'static str {
     "ok"
 }
 
-#[lucy_http(
+#[lucyd_http(
     method      = "GET",
     path        = "/api/objects",
     tags        = "scene",
@@ -49,7 +49,7 @@ async fn list_objects() -> axum::Json<Vec<SceneObject>> {
     axum::Json(vec![])
 }
 
-#[lucy_http(
+#[lucyd_http(
     method      = "POST",
     path        = "/api/objects",
     tags        = "scene",
@@ -65,7 +65,7 @@ async fn create_object(
 
 // WebSocket
 
-#[lucy_ws(
+#[lucyd_ws(
     path        = "/ws/physics",
     tags        = "realtime",
     description = "Real-time physics event stream",
@@ -78,17 +78,17 @@ async fn physics_ws(
 
 // MQTT
 
-#[lucy_mqtt(
+#[lucyd_mqtt(
     topic       = "flipper/physics/collision",
     tags        = "iot",
     description = "Collision events from the physics engine",
 )]
 async fn on_collision(_payload: bytes::Bytes) {}
 
-#[lucy_mqtt(
+#[lucyd_mqtt(
     topic       = "sensors/+/temperature",
     tags        = "iot",
-    description = "Temperature readings — `+` matches any sensor ID",
+    description = "Temperature readings, `+` matches any sensor ID",
 )]
 async fn on_temperature(_payload: bytes::Bytes) {}
 

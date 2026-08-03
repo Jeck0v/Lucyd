@@ -2,7 +2,7 @@
 
 # 4. JSON Schema generation
 
-Lucy integrates with [`schemars`](https://docs.rs/schemars) to generate JSON Schemas at startup for any type passed to `request =` or `response =`.
+Lucyd integrates with [`schemars`](https://docs.rs/schemars) to generate JSON Schemas at startup for any type passed to `request =` or `response =`.
 
 ### **Requirements**
 
@@ -21,7 +21,7 @@ pub struct ScreenEnvelope {
     pub payload:    serde_json::Value,
 }
 
-#[lucy_http(
+#[lucyd_http(
     method   = "POST",
     path     = "/api/screens/send",
     tags     = "screens",

@@ -33,12 +33,12 @@ jobs:
       # rust-embed requires the folder to exist at compile time.
       # In CI we don't run the Node build, so we create an empty stub.
       - name: Create ui/dist stub for rust-embed
-        run: mkdir -p crates/lucy-core/ui/dist
+        run: mkdir -p crates/lucyd-core/ui/dist
 
       - name: Format
         run: cargo fmt --all -- --check
 
-      # --all-features so optional modules (lucy-core's `openapi-diff`) are
+      # --all-features so optional modules (lucyd-core's `openapi-diff`) are
       # linted too; without it they are never compiled in CI.
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features
@@ -65,11 +65,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      # Same stub needed for tests since lucy-core is compiled as a dependency.
+      # Same stub needed for tests since lucyd-core is compiled as a dependency.
       - name: Create ui/dist stub for rust-embed
-        run: mkdir -p crates/lucy-core/ui/dist
+        run: mkdir -p crates/lucyd-core/ui/dist
 
-      # --all-features so optional modules (lucy-core's `openapi-diff`) have
+      # --all-features so optional modules (lucyd-core's `openapi-diff`) have
       # their test suites run.
       - name: Run tests
         run: cargo test --workspace --all-features

@@ -5,20 +5,32 @@
 Import the macros you need at the top of each handler file:
 
 ```rust
-use lucy::{lucy_http, lucy_ws, lucy_mqtt};
+use lucyd::{lucyd_http, lucyd_ws, lucyd_mqtt};
 ```
 
 All three macros are **zero-cost at runtime**: they register metadata at link time via the `inventory` crate without adding any overhead to request processing.
 
+## Renamed in 0.2
+
+These macros used to be spelled `lucy_http`, `lucy_ws` and `lucy_mqtt`, from before the crates were unified under the `lucyd` name.
+
+**The old names still work.** They are the same macros, expand to the same code, and register endpoints identically. They emit a deprecation warning naming their replacement:
+
+```
+warning: use of deprecated macro `lucy_http`: renamed to `lucyd_http`, to match the crate name
+```
+
+Migrating is a find-and-replace of `lucy_` with `lucyd_` in your attributes and imports. If your build runs with `-D warnings`, the warning is an error and the rename is required rather than optional.
+
 ## Contents
 
-- [`#[lucy_http]`](#lucy_http)
-- [`#[lucy_ws]`](#lucy_ws)
-- [`#[lucy_mqtt]`](#lucy_mqtt)
+- [`#[lucyd_http]`](#lucyd_http)
+- [`#[lucyd_ws]`](#lucyd_ws)
+- [`#[lucyd_mqtt]`](#lucyd_mqtt)
 
 ---
 
-## `#[lucy_http]`
+## `#[lucyd_http]`
 
 Marks an Axum HTTP handler for documentation and interactive testing.
 
@@ -30,24 +42,24 @@ Marks an Axum HTTP handler for documentation and interactive testing.
 | `path`        | yes      | string    | Full URL path, must start with `/` (e.g. `"/api/users"`) |
 | `description` | no       | string    | Human-readable explanation shown in the UI |
 | `tags`        | no       | string    | Comma-separated group labels (e.g. `"users, admin"`) used to visually group endpoints |
-| `request`     | no       | type path | Rust type deriving `JsonSchema` — generates the request body schema and pre-fills the UI textarea |
-| `response`    | no       | type path | Rust type deriving `JsonSchema` — generates the response schema shown after execution |
+| `request`     | no       | type path | Rust type deriving `JsonSchema`; generates the request body schema and pre-fills the UI textarea |
+| `response`    | no       | type path | Rust type deriving `JsonSchema`; generates the response schema shown after execution |
 
 ### **Examples**
 
 ```rust
-use lucy::lucy_http;
+use lucyd::lucyd_http;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-// Minimal — required fields only
-#[lucy_http(method = "GET", path = "/health")]
+// Minimal: required fields only
+#[lucyd_http(method = "GET", path = "/health")]
 async fn health() -> &'static str {
     "ok"
 }
 
 // With description and tag
-#[lucy_http(
+#[lucyd_http(
     method      = "GET",
     path        = "/api/users",
     tags        = "users",
@@ -62,7 +74,7 @@ pub struct CreateUserRequest { pub name: String, pub email: String }
 #[derive(Serialize, JsonSchema)]
 pub struct User { pub id: u64, pub name: String, pub email: String }
 
-#[lucy_http(
+#[lucyd_http(
     method      = "POST",
     path        = "/api/users",
     tags        = "users",
@@ -77,25 +89,25 @@ async fn create_user(
 
 ### **Compile errors**
 
-Lucy validates arguments at compile time:
+Lucyd validates arguments at compile time:
 
 ```rust
 // Error: missing required `method` argument
-#[lucy_http(path = "/health")]
+#[lucyd_http(path = "/health")]
 async fn bad() {}
 
 // Error: duplicate `path` argument
-#[lucy_http(method = "GET", path = "/a", path = "/b")]
+#[lucyd_http(method = "GET", path = "/a", path = "/b")]
 async fn bad() {}
 
 // Error: unknown argument `verb`
-#[lucy_http(verb = "GET", path = "/health")]
+#[lucyd_http(verb = "GET", path = "/health")]
 async fn bad() {}
 ```
 
 ---
 
-## `#[lucy_ws]`
+## `#[lucyd_ws]`
 
 Marks an Axum WebSocket upgrade handler for documentation and interactive testing.
 
@@ -111,9 +123,9 @@ Marks an Axum WebSocket upgrade handler for documentation and interactive testin
 
 ```rust
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
-use lucy::lucy_ws;
+use lucyd::lucyd_ws;
 
-#[lucy_ws(
+#[lucyd_ws(
     path        = "/ws/physics",
     tags        = "realtime",
     description = "Real-time physics event stream",
@@ -131,7 +143,7 @@ async fn handle_socket(mut socket: WebSocket) {
 
 ---
 
-## `#[lucy_mqtt]`
+## `#[lucyd_mqtt]`
 
 Marks an MQTT topic handler for documentation generation.
 
@@ -146,19 +158,19 @@ Marks an MQTT topic handler for documentation generation.
 ###**Example**
 
 ```rust
-use lucy::lucy_mqtt;
+use lucyd::lucyd_mqtt;
 
-#[lucy_mqtt(
+#[lucyd_mqtt(
     topic       = "sensors/temperature",
     tags        = "iot",
     description = "Current temperature from IoT sensors",
 )]
 async fn on_temperature(payload: bytes::Bytes) { /* ... */ }
 
-#[lucy_mqtt(
+#[lucyd_mqtt(
     topic       = "devices/+/status",
     tags        = "iot",
-    description = "Device status — `+` matches any single device ID",
+    description = "Device status, `+` matches any single device ID",
 )]
 async fn on_device_status(payload: bytes::Bytes) { /* ... */ }
 ```

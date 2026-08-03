@@ -2,7 +2,7 @@
 
 # 8. UI features
 
-The Lucy UI at `/docs` is an interactive API explorer similar to Swagger UI.
+The Lucyd UI at `/docs` is an interactive API explorer similar to Swagger UI.
 
 ## HTTP endpoints
 
@@ -18,7 +18,7 @@ The Lucy UI at `/docs` is an interactive API explorer similar to Swagger UI.
 - **Connect / Disconnect** per endpoint with status indicator
 - **Message textarea**: pre-filled with a placeholder, `Ctrl+Enter` to send
 - **Message log**: incoming (`←`) and outgoing (`→`) messages with timestamps
-- **Error display**: RFC 6455 close codes mapped to human-readable descriptions (e.g. `1008 → Policy violation — check auth`)
+- **Error display**: RFC 6455 close codes mapped to human-readable descriptions (e.g. `1008 → Policy violation, check auth`)
 
 ## MQTT endpoints
 

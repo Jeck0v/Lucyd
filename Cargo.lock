@@ -938,49 +938,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
-name = "lucy-core"
-version = "0.1.9"
-dependencies = [
- "axum",
- "inventory",
- "jsonschema",
- "lucy-types",
- "rust-embed",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "lucy-macro"
-version = "0.1.9"
-dependencies = [
- "inventory",
- "lucy-core",
- "lucy-types",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "lucy-types"
-version = "0.1.9"
-dependencies = [
- "inventory",
- "schemars",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "lucyd"
-version = "0.1.9"
+version = "0.2.0"
 dependencies = [
  "axum",
  "inventory",
- "lucy-core",
- "lucy-macro",
- "lucy-types",
+ "lucyd-core",
+ "lucyd-macro",
+ "lucyd-types",
  "schemars",
  "serde",
  "serde_json",
@@ -989,13 +954,48 @@ dependencies = [
 
 [[package]]
 name = "lucyd-cli"
-version = "0.1.9"
+version = "0.2.0"
 dependencies = [
  "clap",
- "lucy-core",
+ "lucyd-core",
  "serde_json",
  "serde_yaml_ng",
  "tempfile",
+]
+
+[[package]]
+name = "lucyd-core"
+version = "0.2.0"
+dependencies = [
+ "axum",
+ "inventory",
+ "jsonschema",
+ "lucyd-types",
+ "rust-embed",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "lucyd-macro"
+version = "0.2.0"
+dependencies = [
+ "inventory",
+ "lucyd-core",
+ "lucyd-types",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "lucyd-types"
+version = "0.2.0"
+dependencies = [
+ "inventory",
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

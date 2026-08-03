@@ -5,7 +5,7 @@
 ```
 your-axum-app
 │
-├── #[lucy_http / ws / mqtt]        ← proc-macros (crates/lucy-macro)
+├── #[lucyd_http / ws / mqtt]        ← proc-macros (crates/lucyd-macro)
 │         │                            parse & validate args at compile time
 │         ▼
 │   inventory::submit!               ← linker-magic static registration
@@ -24,30 +24,53 @@ your-axum-app
 
 ## Crate responsibilities
 
-| Crate        | Role |
-|--------------|------|
-| `lucy`       | Public facade: the only crate consumers import |
-| `lucy-macro` | Proc-macros: parse and validate `#[lucy_*]` attributes, emit `inventory::submit!` |
-| `lucy-core`  | Runtime: global registry, spec generation, Axum router, asset serving |
-| `lucy-types` | Shared types: `Protocol`, `EndpointMeta`, `EndpointMetaStatic` |
-| `xtask`      | Build tooling: `cargo xtask build-ui` |
+| Crate        | Published | Role |
+|--------------|-----------|------|
+| `lucyd`       | yes | Public facade: the only crate consumers import |
+| `lucyd-macro` | yes | Proc-macros: parse and validate `#[lucyd_*]` attributes, emit `inventory::submit!` |
+| `lucyd-core`  | yes | Runtime: global registry, spec generation, Axum router, asset serving, OpenAPI diff |
+| `lucyd-types` | yes | Shared types: `Protocol`, `EndpointMeta`, `EndpointMetaStatic` |
+| `lucyd-cli`   | yes | The `lucyd` binary: file discovery, YAML/JSON loading, exit codes |
+| `xtask`      | no  | Build tooling: `cargo xtask build-ui`, `build-docs`, `import-openapi` |
+
+Two of these are meant to be named directly: `lucyd` as a dependency, `lucyd-cli` as an installed binary. The rest are reached through them.
 
 ## Dependency flow
 
-Consumers only need `lucy`:
+Consumers only need `lucyd`:
 
 ```
-your-crate  →  lucy  →  lucy-macro
-                      →  lucy-core  →  lucy-types
-                                    →  inventory
-                                    →  rust-embed
-                      →  lucy-types
-                      →  inventory  (re-exported as lucy::_private::inventory)
-                      →  schemars   (re-exported as lucy::_private::schemars)
-                      →  serde_json (re-exported as lucy::_private::serde_json)
+your-crate  →  lucyd  →  lucyd-macro
+                       →  lucyd-core  →  lucyd-types
+                                      →  inventory
+                                      →  rust-embed
+                       →  lucyd-types
+                       →  inventory  (re-exported as lucyd::_private::inventory)
+                       →  schemars   (re-exported as lucyd::_private::schemars)
+                       →  serde_json (re-exported as lucyd::_private::serde_json)
+
+lucyd-cli   →  lucyd-core  (feature "openapi-diff")
+            →  clap, serde_json, serde_yaml_ng
 ```
 
-Macro-generated code references `::lucy::_private::*` so consumer crates only need `lucy` in `Cargo.toml`.
+Macro-generated code references `::lucyd::_private::*` so consumer crates only need `lucyd` in `Cargo.toml`. That indirection is also why the internal crate names are free to change: no user code ever spells them.
+
+## Where a feature's logic lives
+
+The recurring rule is that `lucyd-core` decides and the front-ends only sequence. The clearest case is the OpenAPI diff:
+
+| Concern | Crate |
+|---|---|
+| What counts as a difference between two documents | `lucyd-core` |
+| How a report reads, in both human and JSON form | `lucyd-core` |
+| Whether a report should fail a build | `lucyd-core` |
+| Which files to compare when none were named | `lucyd-cli` |
+| Parsing YAML as well as JSON | `lucyd-cli` |
+| Turning a report into a process exit code | `lucyd-cli` |
+
+A report produced by a test is therefore byte-identical to one produced by the binary. The comparison sits behind the `openapi-diff` feature of `lucyd-core`, off by default, so an application that only serves `/docs` never compiles it.
+
+The same split applies elsewhere: `lucyd-macro` validates attribute arguments and emits registration code but knows nothing about the spec format, and `lucyd-core` owns both the internal spec and the OpenAPI export without knowing how either is requested.
 
 ---
 

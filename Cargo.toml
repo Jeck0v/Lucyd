@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members  = [
-    "crates/lucy",
-    "crates/lucy-types",
-    "crates/lucy-macro",
-    "crates/lucy-core",
+    "crates/lucyd",
+    "crates/lucyd-types",
+    "crates/lucyd-macro",
+    "crates/lucyd-core",
     "crates/lucyd-cli",
     "xtask",
 ]
 exclude = ["ui"]
 
 [workspace.package]
-version     = "0.1.9"
+version     = "0.2.0"
 edition     = "2024"
 license     = "MIT"
 authors     = ["Arnaud Fischer"]
@@ -19,9 +19,9 @@ repository  = "https://github.com/Jeck0v/Lucyd"
 
 [workspace.dependencies]
 # Internal crates, path for local dev, version resolved from crates.io when published
-lucy-types = { path = "crates/lucy-types", version = "0.1.9" }
-lucy-core  = { path = "crates/lucy-core",  version = "0.1.9" }
-lucy-macro = { path = "crates/lucy-macro", version = "0.1.9" }
+lucyd-types = { path = "crates/lucyd-types", version = "0.2.0" }
+lucyd-core  = { path = "crates/lucyd-core",  version = "0.2.0" }
+lucyd-macro = { path = "crates/lucyd-macro", version = "0.2.0" }
 
 # Async runtime
 tokio = { version = "1.44.2", features = ["full"] }

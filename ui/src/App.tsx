@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { AuthModal } from './components/AuthModal'
 import type { Protocol } from './types'
 
-/** The four tabs available in the Lucy UI. */
+/** The four tabs available in the Lucyd UI. */
 type ActiveTab = 'http' | 'ws' | 'mqtt' | 'models'
 
 /** Maps a protocol tab value to the corresponding `Protocol` discriminant. */
@@ -34,7 +34,7 @@ const TABS: ActiveTab[] = ['http', 'ws', 'mqtt', 'models']
 // ---------------------------------------------------------------------------
 
 /**
- * Root application component for Lucy.
+ * Root application component for Lucyd.
  *
  * Fetches the API spec from the Rust/Axum backend, splits endpoints by
  * protocol, and renders the appropriate panel based on the active tab.
@@ -60,7 +60,7 @@ function AppInner(): React.JSX.Element {
       <div className="app__banner">
         <header className="app__header">
           <div className="app__header-left">
-            <h1 className="app__title">Lucy</h1>
+            <h1 className="app__title">Lucyd</h1>
             {spec !== null && (
               <p className="app__version">v{spec.version}</p>
             )}
