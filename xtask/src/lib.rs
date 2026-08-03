@@ -39,12 +39,22 @@ const NPM_INSTALL_ARGS: &[&str] = &["install"];
 /// Arguments to `npm` for building the frontend.
 const NPM_BUILD_ARGS: &[&str] = &["run", "build"];
 
+/// File the built bundle must contain for `lucyd-core` to serve anything.
+///
+/// `rust-embed` embeds whatever `UI_DIST_DIR` holds at compile time, including
+/// nothing at all: an empty directory compiles fine and yields a binary that
+/// answers `404 UI not built` on every `/docs` request. npm's exit code only
+/// says the bundler ran, not that its output landed where lucyd-core reads it
+/// from, so the two have to be checked separately.
+const UI_ENTRY_FILE: &str = "index.html";
+
 /// Compiles the React frontend.
 ///
 /// Steps:
 /// 1. Run `npm install` inside `ui/`
 /// 2. Run `npm run build` inside `ui/`
-/// 3. Print success message with output path
+/// 3. Verify the bundle landed in `UI_DIST_DIR`
+/// 4. Print success message with output path
 pub fn build_ui(workspace_root: &Path) -> Result<(), String> {
     let ui_dir = workspace_root.join(UI_DIR);
 
@@ -65,11 +75,34 @@ pub fn build_ui(workspace_root: &Path) -> Result<(), String> {
     println!("==> Building React frontend...");
     run_command(BUILD_CMD, NPM_BUILD_ARGS, &ui_dir)?;
 
+    let dist_dir = workspace_root.join(UI_DIST_DIR);
+    verify_bundle(&dist_dir)?;
+
     println!(
         "==> UI built successfully. Output: `{}`",
-        workspace_root.join(UI_DIST_DIR).display()
+        dist_dir.display()
     );
     Ok(())
+}
+
+/// Confirms the built bundle landed where `lucyd-core` embeds it from.
+///
+/// The two paths involved are configured in different files — `build.outDir` in
+/// `ui/vite.config.ts` and `#[folder]` in `lucyd-core/src/assets.rs` — so
+/// nothing but this check couples them. Without it, a drift between the two
+/// makes `build-ui` report success while producing a binary with no UI in it,
+/// and the first sign of trouble is a `404` in a browser after release.
+fn verify_bundle(dist_dir: &Path) -> Result<(), String> {
+    if dist_dir.join(UI_ENTRY_FILE).is_file() {
+        return Ok(());
+    }
+    Err(format!(
+        "the frontend build reported success but `{}` holds no `{UI_ENTRY_FILE}`.\n  \
+         `lucyd-core` embeds that directory verbatim, so shipping this build would \
+         produce a binary that answers `404 UI not built` on every /docs request.\n  \
+         Check `build.outDir` in `{UI_DIR}/vite.config.ts`: it must resolve to that path.",
+        dist_dir.display()
+    ))
 }
 
 /// Runs an external command in the given working directory, inheriting stdio.
@@ -178,9 +211,44 @@ pub fn parse_import_openapi_args(args: &[String]) -> Result<ImportOpenApiArgs, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     const FIXTURE_INPUT: &str = "openapi.yaml";
     const FIXTURE_OUT: &str = "src/custom_out.rs";
+
+    #[test]
+    fn a_bundle_carrying_the_entry_file_passes_verification() {
+        let dist = TempDir::new().expect("a temporary directory must be available");
+        fs::write(dist.path().join(UI_ENTRY_FILE), "<!doctype html>")
+            .expect("the entry file must be writable");
+
+        assert_eq!(verify_bundle(dist.path()), Ok(()));
+    }
+
+    #[test]
+    fn an_empty_dist_directory_fails_verification() {
+        let dist = TempDir::new().expect("a temporary directory must be available");
+
+        let error = verify_bundle(dist.path())
+            .expect_err("an empty bundle must not be reported as a successful build");
+
+        assert!(error.contains(UI_ENTRY_FILE), "{error}");
+        assert!(
+            error.contains("outDir"),
+            "the message must name the setting that fixes it, got: {error}"
+        );
+    }
+
+    #[test]
+    fn a_missing_dist_directory_fails_verification() {
+        let root = TempDir::new().expect("a temporary directory must be available");
+
+        assert!(
+            verify_bundle(&root.path().join("never-created")).is_err(),
+            "a build that produced no output directory at all must be an error"
+        );
+    }
 
     #[test]
     fn parse_minimal_args_uses_default_out() {

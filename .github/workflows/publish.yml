@@ -41,8 +41,23 @@ jobs:
           sed -i "s/\(lucyd-core.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
           sed -i "s/\(lucyd-macro.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
 
-      - name: Create ui/dist stub for rust-embed
-        run: mkdir -p crates/lucyd-core/ui/dist
+      # The published crate embeds `crates/lucyd-core/ui/dist/` verbatim, and a
+      # copy of it is committed. Rebuilding it here rather than trusting that
+      # copy is what guarantees the bundle a user downloads was built from the
+      # source at this tag: nothing else enforces that the two stay in step, so
+      # a `.tsx` changed without re-running build-ui would otherwise ship a
+      # stale UI silently. `build-ui` fails when the bundle does not land, so a
+      # broken frontend build stops the release instead of publishing an empty
+      # `/docs`. This is deliberately not the `mkdir -p` stub the lint and test
+      # jobs use: there, an absent UI is fine because nothing serves it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build the docs UI
+        run: cargo xtask build-ui
 
       # --all-features so the OpenAPI diff is tested before it ships. Building
       # the workspace happens to enable it anyway, since lucyd-cli requires it,
