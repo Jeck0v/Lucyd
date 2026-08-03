@@ -47,6 +47,13 @@ pub struct EndpointMeta {
     /// HTTP verb (`GET`, `POST`, ...). `None` for WebSocket and MQTT endpoints.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<String>,
+    /// JSON Schema describing the query string, when the endpoint declares one.
+    ///
+    /// One property per query parameter; the schema's `required` array is what
+    /// separates a mandatory parameter from an optional one. MQTT topics have no
+    /// query string, so this is always `None` for [`Protocol::Mqtt`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_schema: Option<serde_json::Value>,
     /// JSON Schema describing the expected request payload, when applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_schema: Option<serde_json::Value>,
@@ -78,6 +85,9 @@ pub struct EndpointMetaStatic {
     pub method: Option<&'static str>,
     /// Tags for grouping, as a static string slice.
     pub tags: &'static [&'static str],
+    /// Called once at startup to generate the query-string JSON Schema.
+    /// `None` for endpoints that declare no query parameters.
+    pub query_schema_fn: Option<fn() -> serde_json::Value>,
     /// Called once at startup to generate the request JSON Schema.
     /// `None` for endpoints with no request body.
     pub request_schema_fn: Option<fn() -> serde_json::Value>,
@@ -95,6 +105,7 @@ impl EndpointMetaStatic {
             protocol: self.protocol.clone(),
             description: self.description.map(|s| s.to_owned()),
             method: self.method.map(|s| s.to_owned()),
+            query_schema: self.query_schema_fn.map(|f| f()),
             request_schema: self.request_schema_fn.map(|f| f()),
             response_schema: self.response_schema_fn.map(|f| f()),
             tags: self.tags.iter().map(|s| s.to_string()).collect(),
@@ -111,9 +122,9 @@ inventory::collect!(EndpointMetaStatic);
 impl EndpointMeta {
     /// Create a new [`EndpointMeta`] with only the mandatory fields populated.
     ///
-    /// Optional fields (`description`, `method`, `request_schema`,
-    /// `response_schema`) are initialised to `None` and can be filled in
-    /// afterwards by mutating the returned value.
+    /// Optional fields (`description`, `method`, `query_schema`,
+    /// `request_schema`, `response_schema`) are initialised to `None` and can
+    /// be filled in afterwards by mutating the returned value.
     ///
     /// # Examples
     ///
@@ -132,6 +143,7 @@ impl EndpointMeta {
             protocol,
             description: None,
             method: None,
+            query_schema: None,
             request_schema: None,
             response_schema: None,
             tags: Vec::new(),
@@ -189,8 +201,41 @@ mod tests {
         assert_eq!(deserialized.protocol, Protocol::Http);
         assert!(deserialized.description.is_none());
         assert!(deserialized.method.is_none());
+        assert!(deserialized.query_schema.is_none());
         assert!(deserialized.request_schema.is_none());
         assert!(deserialized.response_schema.is_none());
         assert!(deserialized.tags.is_empty());
+    }
+
+    #[test]
+    fn an_endpoint_without_query_parameters_omits_the_key_entirely() {
+        // The reason SPEC_VERSION does not need bumping: a UI bundle built
+        // before `query_schema` existed must see byte-identical JSON.
+        let json =
+            serde_json::to_string(&EndpointMeta::new(HEALTH_NAME, HEALTH_PATH, Protocol::Http))
+                .expect("serialization of EndpointMeta must succeed");
+
+        assert!(
+            !json.contains("query_schema"),
+            "an absent query schema must not emit the key: {json}"
+        );
+    }
+
+    #[test]
+    fn a_declared_query_schema_survives_a_serde_round_trip() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "limit": { "type": "integer" } },
+            "required": ["limit"],
+        });
+        let mut original = EndpointMeta::new("scores", "/api/scores", Protocol::Http);
+        original.query_schema = Some(schema.clone());
+
+        let serialized =
+            serde_json::to_string(&original).expect("serialization of EndpointMeta must succeed");
+        let deserialized: EndpointMeta = serde_json::from_str(&serialized)
+            .expect("deserialization of EndpointMeta must succeed");
+
+        assert_eq!(deserialized.query_schema, Some(schema));
     }
 }

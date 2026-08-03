@@ -85,6 +85,35 @@ pub async fn create_user() -> axum::Json<CreateUserResponse> {
 
 The stub is deliberately parameter-less: wiring up the request-body extractor is left to whoever implements the handler, since the stub's only job is to compile and carry accurate metadata.
 
+### Query parameters
+
+An operation's `in: query` parameters are folded into one `{Op}Params` struct and bound with `query = {Op}Params`. Each parameter becomes a field: its `schema` decides the Rust type, its `description` becomes the field's doc comment, and a parameter that is not `required: true` becomes an `Option<T>`. A parameter declared without a `schema` at all becomes a `String` — it arrives as text in the URL either way.
+
+```yaml
+    get:
+      operationId: list_scores
+      parameters:
+        - { name: board, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, description: Maximum rows., schema: { type: integer } }
+```
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ListScoresParams {
+    pub board: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+}
+
+/// operationId: list_scores
+#[lucyd_http(method = "GET", path = "/api/scores", query = ListScoresParams)]
+pub async fn list_scores() {
+    todo!("Implement handler")
+}
+```
+
+Like the request body, the struct is documented but not extracted: add `Query(params): Query<ListScoresParams>` to the signature when you implement the handler. Path parameters stay a `/// Path parameters: ...` doc line — the path template already names them, and no macro argument binds them.
+
 ## Incremental merge: re-running is safe
 
 Re-running the importer against an updated spec merges into the existing `--out` file rather than overwriting it. The reconciliation is keyed on the `/// operationId: {id}` doc comment above each stub, not the function's name specifically so a handler can be renamed by hand (`create_user` → `handle_create_user`) without a later re-import reporting a spurious remove-then-add for what is still the same operation. A plain `//` comment can't serve this role: it isn't a token in Rust's grammar, so `syn` drops it on parse and it wouldn't survive a parse → merge → re-emit round trip, whereas a `///` doc comment desugars to a real `#[doc = "..."]` attribute that does.
@@ -116,7 +145,7 @@ The `Finished with warnings.` line only appears when at least one operation was 
 
 **Consumer dependencies.** Generated code assumes the target project already depends on `lucyd`, `schemars`, `serde` (with the `derive` feature), and `axum`, processes the same peer dependencies listed in [§1, Installation](01-installation.md). A schema with no fixed `properties` (or no recognized `type` at all) maps to `serde_json::Value` / `HashMap<String, serde_json::Value>`, so `serde_json` should be added too if your spec has any free-form objects.
 
-See [§11, Known limitations](11-limitations.md) for the importer's own scoping limits ($ref resolution, `oneOf`/`allOf`/`anyOf`, parameters, security schemes, hand-added `use` statements).
+See [§11, Known limitations](11-limitations.md) for the importer's own scoping limits ($ref resolution, `oneOf`/`allOf`/`anyOf`, path parameters, security schemes, hand-added `use` statements).
 
 ---
 

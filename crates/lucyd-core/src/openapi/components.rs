@@ -62,6 +62,27 @@ impl ComponentSchemas {
         root_global
     }
 
+    /// Hoists only a root schema's nested definitions, returning the root
+    /// itself — unstored — with its internal `$ref`s rewritten into the
+    /// components namespace.
+    ///
+    /// The counterpart to [`Self::hoist_root_schema`] for a schema that is
+    /// consumed by value rather than by reference: query parameters inline each
+    /// of their properties into a Parameter Object, so only the named types
+    /// those properties reach need a `components.schemas` entry. Hoisting the
+    /// root as well would leave an orphan schema nothing points at.
+    pub(super) fn inline_root_schema(&mut self, raw: &Value) -> Value {
+        let mut root = raw.clone();
+        let mut extracted = extract_definitions(&mut root);
+        rewrite_all_definition_refs(&mut root, &mut extracted);
+
+        let (renames, decisions) = self.resolve_global_names(extracted.into_iter().collect());
+        self.apply_renames_and_insert(decisions, &renames);
+        rewrite_renamed_refs(&mut root, &renames);
+
+        root
+    }
+
     /// Applies any local-to-global rename to internal `$ref`s in each
     /// decision, then inserts the ones that still need to be stored.
     fn apply_renames_and_insert(

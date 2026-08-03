@@ -54,6 +54,29 @@ fn generated_document_conforms_to_openapi_31_meta_schema() {
     }));
     registry.register(create);
 
+    // A GET whose query string mixes a required scalar, a documented optional
+    // one, and a property that `$ref`s a hoisted definition.
+    let mut scores = http_endpoint("scores", "GET", "/api/scores");
+    scores.query_schema = Some(json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "ScoreFilters",
+        "type": "object",
+        "required": ["board"],
+        "properties": {
+            "board": { "type": "string" },
+            "limit": {
+                "description": "Maximum number of rows returned.",
+                "type": ["integer", "null"],
+                "format": "uint32"
+            },
+            "order": { "$ref": "#/definitions/SortOrder" }
+        },
+        "definitions": {
+            "SortOrder": { "type": "string", "enum": ["asc", "desc"] }
+        }
+    }));
+    registry.register(scores);
+
     // A WebSocket endpoint that must be excluded without breaking generation.
     registry.register(EndpointMeta::new(
         "events",

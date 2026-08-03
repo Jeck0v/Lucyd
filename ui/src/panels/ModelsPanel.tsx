@@ -6,25 +6,26 @@ interface ModelsPanelProps {
   endpoints: EndpointMeta[]
 }
 
+/** The schema-carrying fields of an endpoint, in the order they are listed. */
+const SCHEMA_FIELDS = ['query_schema', 'request_schema', 'response_schema'] as const
+
 /**
- * Collects every unique JSON Schema from `request_schema` and `response_schema`
- * across all endpoints, deduplicates by `title` (or a generated key), and
- * renders each with a `SchemaViewer`.
+ * Collects every unique JSON Schema an endpoint declares — `query_schema`,
+ * `request_schema` and `response_schema` — across all endpoints, deduplicates
+ * by `title` (or a generated key), and renders each with a `SchemaViewer`.
  */
 export function ModelsPanel({ endpoints }: ModelsPanelProps): React.JSX.Element {
   const models = useMemo(() => {
     const seen = new Map<string, Record<string, unknown>>()
 
     for (const ep of endpoints) {
-      if (ep.request_schema) {
-        const s = ep.request_schema as Record<string, unknown>
-        const key = (s.title as string | undefined) ?? `${ep.name}_request`
-        if (!seen.has(key)) seen.set(key, s)
-      }
-      if (ep.response_schema) {
-        const s = ep.response_schema as Record<string, unknown>
-        const key = (s.title as string | undefined) ?? `${ep.name}_response`
-        if (!seen.has(key)) seen.set(key, s)
+      for (const field of SCHEMA_FIELDS) {
+        const schema = ep[field]
+        if (!schema) continue
+        const key =
+          (schema.title as string | undefined) ??
+          `${ep.name}_${field.replace('_schema', '')}`
+        if (!seen.has(key)) seen.set(key, schema)
       }
     }
 

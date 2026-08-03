@@ -8,6 +8,7 @@ The Lucyd UI at `/docs` is an interactive API explorer similar to Swagger UI.
 
 - **Collapsible cards** per endpoint, grouped by tag
 - **Path parameters**: auto-detected from `{param}` placeholders, with individual inputs
+- **Query parameters**: declared with `query = T`, rendered in the same table with their type, doc comment and a `*` on the required ones, and appended to the request URL
 - **Request body**: editable textarea pre-filled with a typed example derived from the request schema
 - **Execute**: sends the request from the browser and displays the response with status code and latency
 - **cURL preview**: always-visible, updates live as inputs or body change
@@ -16,6 +17,7 @@ The Lucyd UI at `/docs` is an interactive API explorer similar to Swagger UI.
 ## WebSocket endpoints
 
 - **Connect / Disconnect** per endpoint with status indicator
+- **Query parameters**: declared with `query = T` and merged into the upgrade URL — the only channel a browser has at connect time, since the `WebSocket` constructor cannot set headers
 - **Message textarea**: pre-filled with a placeholder, `Ctrl+Enter` to send
 - **Message log**: incoming (`←`) and outgoing (`→`) messages with timestamps
 - **Error display**: RFC 6455 close codes mapped to human-readable descriptions (e.g. `1008 → Policy violation, check auth`)
@@ -37,11 +39,11 @@ Click **Authorize** in the top-right corner to configure global authentication a
 | API Key      | `<custom-header>: <key>` |
 | Basic Auth   | `Authorization: Basic <base64>` |
 
-Auth is persisted in `localStorage` across page reloads. For WebSocket endpoints, a bearer token is forwarded as `?token=<value>` in the URL.
+Auth is persisted in `localStorage` across page reloads. For WebSocket endpoints, a bearer token is forwarded as `?token=<value>` in the URL — unless the endpoint declares its own `token` query parameter, in which case the value you entered is sent and nothing is injected.
 
 ## Models tab
 
-Lists all unique JSON Schemas collected from `request_schema` and `response_schema` across all endpoints, with "Example Value" and "Schema" tabs per model.
+Lists all unique JSON Schemas collected from `query_schema`, `request_schema` and `response_schema` across all endpoints, with "Example Value" and "Schema" tabs per model.
 
 ---
 

@@ -9,8 +9,8 @@
 //! unresolved; the generator resolves `#/components/schemas/...` refs itself
 //! so it can cache and dedup by component name.
 
-use serde_json::{Map, Value};
-use std::collections::HashSet;
+use serde_json::{json, Map, Value};
+use std::collections::{BTreeSet, HashSet};
 
 /// HTTP verbs recognized as Path Item Object keys, in the order OpenAPI 3.1
 /// lists them.
@@ -37,11 +37,12 @@ pub struct ImportOperation {
     /// `tags`, in document order.
     pub tags: Vec<String>,
     /// Names of `in: path` parameters — surfaced as a doc comment only;
-    /// `#[lucyd_http]` has no slot for parameters (only `request`/`response`
-    /// bind to the JSON body).
+    /// `#[lucyd_http]` has no argument that binds them, since the path template
+    /// already names them.
     pub path_params: Vec<String>,
-    /// Names of `in: query` parameters — same doc-comment-only treatment.
-    pub query_params: Vec<String>,
+    /// The `in: query` parameters folded into one object schema, which
+    /// [`super::codegen`] turns into a struct bound by `#[lucyd_http(query = T)]`.
+    pub query_schema: Option<Value>,
     /// The `application/json` request body schema, if any.
     pub request_schema: Option<Value>,
     /// The `application/json` schema of the first 2xx (or `default`)
@@ -126,7 +127,7 @@ fn build_operation(
         description,
         tags,
         path_params: Vec::new(),
-        query_params: Vec::new(),
+        query_schema: None,
         request_schema: None,
         response_schema: None,
         skip_reason: None,
@@ -139,7 +140,7 @@ fn build_operation(
         };
     }
 
-    let (path_params, query_params) =
+    let (path_params, query_schema) =
         match collect_parameters(document, path_level_params, operation.get("parameters")) {
             Ok(params) => params,
             Err(reason) => {
@@ -170,16 +171,16 @@ fn build_operation(
     };
 
     let mut visited = HashSet::new();
-    let unsupported = request_schema
-        .as_ref()
-        .filter(|schema| schema_uses_unsupported_composition(document, schema, &mut visited))
-        .or_else(|| {
-            response_schema.as_ref().filter(|schema| {
-                schema_uses_unsupported_composition(document, schema, &mut visited)
-            })
-        });
+    let uses_unsupported = [
+        query_schema.as_ref(),
+        request_schema.as_ref(),
+        response_schema.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|schema| schema_uses_unsupported_composition(document, schema, &mut visited));
 
-    if unsupported.is_some() {
+    if uses_unsupported {
         return ImportOperation {
             skip_reason: Some(
                 "uses `oneOf`/`allOf`/`anyOf`/`not`, which don't map to a single Rust type"
@@ -191,7 +192,7 @@ fn build_operation(
 
     ImportOperation {
         path_params,
-        query_params,
+        query_schema,
         request_schema,
         response_schema,
         ..base
@@ -224,19 +225,71 @@ fn resolve_ref(document: &Value, value: &Value) -> Result<Value, String> {
     Ok(current)
 }
 
-/// Collects distinct `path`/`query` parameter names from the path-level and
-/// operation-level `parameters` arrays combined (operation-level parameters
-/// can repeat or override path-level ones; for a doc-comment-only listing,
-/// simple name-based de-duplication is enough).
+/// Accumulates `in: query` Parameter Objects into the single object schema
+/// that `#[lucyd_http(query = T)]` binds to.
+///
+/// The result is deliberately the same shape schemars would emit for the
+/// equivalent Rust struct — `properties` plus `required` — so
+/// [`super::rust_type::TypeGenerator`] can turn it into a struct with no
+/// query-specific code path of its own.
+#[derive(Default)]
+struct QuerySchema {
+    properties: Map<String, Value>,
+    required: BTreeSet<String>,
+}
+
+impl QuerySchema {
+    /// Adds one Parameter Object, a later declaration of the same name winning
+    /// — which is how OpenAPI defines an operation-level parameter overriding
+    /// the path-level one it repeats.
+    fn insert(&mut self, name: &str, parameter: &Value) {
+        // A parameter declared through `content` rather than `schema` still
+        // arrives as text in the URL, so text is the honest default.
+        let mut schema = parameter
+            .get("schema")
+            .cloned()
+            .unwrap_or_else(|| json!({ "type": "string" }));
+
+        // Carried onto the property so the generated field keeps the
+        // documentation the OpenAPI document gave the parameter.
+        if let (Some(object), Some(description)) =
+            (schema.as_object_mut(), parameter.get("description"))
+        {
+            object.insert("description".to_string(), description.clone());
+        }
+
+        match parameter.get("required").and_then(Value::as_bool) {
+            Some(true) => self.required.insert(name.to_string()),
+            _ => self.required.remove(name),
+        };
+        self.properties.insert(name.to_string(), schema);
+    }
+
+    /// The finished schema, or `None` when the operation declared no query
+    /// parameter at all — in which case no `query =` argument is emitted.
+    fn build(self) -> Option<Value> {
+        if self.properties.is_empty() {
+            return None;
+        }
+        Some(json!({
+            "type": "object",
+            "properties": Value::Object(self.properties),
+            "required": self.required.into_iter().collect::<Vec<_>>(),
+        }))
+    }
+}
+
+/// Collects the distinct `in: path` parameter names, and folds the `in: query`
+/// ones into a single object schema, from the path-level and operation-level
+/// `parameters` arrays combined.
 fn collect_parameters(
     document: &Value,
     path_level: Option<&Value>,
     operation_level: Option<&Value>,
-) -> Result<(Vec<String>, Vec<String>), String> {
+) -> Result<(Vec<String>, Option<Value>), String> {
     let mut path_params = Vec::new();
-    let mut query_params = Vec::new();
     let mut seen_path = HashSet::new();
-    let mut seen_query = HashSet::new();
+    let mut query = QuerySchema::default();
 
     for params in [path_level, operation_level].into_iter().flatten() {
         let array = params
@@ -244,27 +297,23 @@ fn collect_parameters(
             .ok_or_else(|| "`parameters` must be an array".to_string())?;
         for param in array {
             let resolved = resolve_ref(document, param)?;
-            let name = resolved
+            let Some(name) = resolved
                 .get("name")
                 .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            if name.is_empty() {
+                .filter(|name| !name.is_empty())
+                .map(String::from)
+            else {
                 continue;
-            }
+            };
             match resolved.get("in").and_then(Value::as_str) {
-                Some("path") if seen_path.insert(name.clone()) => {
-                    path_params.push(name);
-                }
-                Some("query") if seen_query.insert(name.clone()) => {
-                    query_params.push(name);
-                }
+                Some("path") if seen_path.insert(name.clone()) => path_params.push(name),
+                Some("query") => query.insert(&name, &resolved),
                 _ => {}
             }
         }
     }
 
-    Ok((path_params, query_params))
+    Ok((path_params, query.build()))
 }
 
 /// Extracts the `application/json` schema from a (possibly `$ref`'d) request
@@ -481,13 +530,93 @@ mod tests {
                 "parameters": [{ "name": "id", "in": "path" }],
                 "get": {
                     "operationId": "get_user",
-                    "parameters": [{ "name": "verbose", "in": "query" }]
+                    "parameters": [{
+                        "name": "verbose",
+                        "in": "query",
+                        "required": true,
+                        "description": "Include the full record.",
+                        "schema": { "type": "boolean" }
+                    }]
                 }
             }
         }));
         let ops = extract_operations(&document);
+
         assert_eq!(ops[0].path_params, vec!["id".to_string()]);
-        assert_eq!(ops[0].query_params, vec!["verbose".to_string()]);
+        assert_eq!(
+            ops[0].query_schema,
+            Some(json!({
+                "type": "object",
+                "properties": {
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Include the full record."
+                    }
+                },
+                "required": ["verbose"]
+            })),
+            "query parameters must fold into the object schema `query = T` binds to"
+        );
+    }
+
+    #[test]
+    fn an_operation_level_query_parameter_overrides_the_path_level_one() {
+        let document = document_with_paths(json!({
+            "/users": {
+                "parameters": [{
+                    "name": "page", "in": "query", "required": true,
+                    "schema": { "type": "string" }
+                }],
+                "get": {
+                    "operationId": "list_users",
+                    "parameters": [{
+                        "name": "page", "in": "query",
+                        "schema": { "type": "integer" }
+                    }]
+                }
+            }
+        }));
+        let schema = extract_operations(&document)[0]
+            .query_schema
+            .clone()
+            .expect("a query parameter must produce a schema");
+
+        assert_eq!(schema["properties"]["page"]["type"], "integer");
+        assert_eq!(
+            schema["required"],
+            json!([]),
+            "the operation-level declaration drops the path-level `required`"
+        );
+    }
+
+    #[test]
+    fn a_query_parameter_without_a_schema_defaults_to_a_string() {
+        let document = document_with_paths(json!({
+            "/users": {
+                "get": {
+                    "operationId": "list_users",
+                    "parameters": [{ "name": "q", "in": "query" }]
+                }
+            }
+        }));
+        let schema = extract_operations(&document)[0]
+            .query_schema
+            .clone()
+            .expect("a query parameter must produce a schema");
+
+        assert_eq!(schema["properties"]["q"]["type"], "string");
+    }
+
+    #[test]
+    fn an_operation_without_query_parameters_has_no_query_schema() {
+        let document = document_with_paths(json!({
+            USERS_PATH: { "get": { "parameters": [{ "name": "id", "in": "path" }] } }
+        }));
+
+        assert!(
+            extract_operations(&document)[0].query_schema.is_none(),
+            "no `in: query` parameter means no `query =` argument to emit"
+        );
     }
 
     #[test]

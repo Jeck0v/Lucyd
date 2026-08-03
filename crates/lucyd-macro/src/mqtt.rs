@@ -114,6 +114,9 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
                 description:       #description_tokens,
                 method:            ::core::option::Option::None,
                 tags:              #tags_tokens,
+                // MQTT topics have no query string; `#[lucyd_mqtt]` accordingly
+                // rejects `query` as an unknown argument.
+                query_schema_fn:    ::core::option::Option::None,
                 request_schema_fn:  #request_schema_tokens,
                 response_schema_fn: #response_schema_tokens,
             }

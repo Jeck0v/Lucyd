@@ -129,6 +129,7 @@ Migrating is a find-and-replace of `lucy_` with `lucyd_` in your attributes and 
 ### Contents
 
 - [`#[lucyd_http]`](#lucyd_http)
+- [Query parameters](#query-parameters)
 - [`#[lucyd_ws]`](#lucyd_ws)
 - [`#[lucyd_mqtt]`](#lucyd_mqtt)
 
@@ -146,8 +147,11 @@ Marks an Axum HTTP handler for documentation and interactive testing.
 | `path`        | yes      | string    | Full URL path, must start with `/` (e.g. `"/api/users"`) |
 | `description` | no       | string    | Human-readable explanation shown in the UI |
 | `tags`        | no       | string    | Comma-separated group labels (e.g. `"users, admin"`) used to visually group endpoints |
+| `query`       | no       | type path | Rust type deriving `JsonSchema`; declares the query string (see [Query parameters](#query-parameters)) |
 | `request`     | no       | type path | Rust type deriving `JsonSchema`; generates the request body schema and pre-fills the UI textarea |
 | `response`    | no       | type path | Rust type deriving `JsonSchema`; generates the response schema shown after execution |
+
+`path` must be a path template only. A query string written into it — `path = "/api/scores?limit=10"` — is a compile error, because it would corrupt the OpenAPI path template and make the endpoint stop matching itself in `lucyd diff`, which splits the path on `/` to identify an operation.
 
 #### **Examples**
 
@@ -207,7 +211,74 @@ async fn bad() {}
 // Error: unknown argument `verb`
 #[lucyd_http(verb = "GET", path = "/health")]
 async fn bad() {}
+
+// Error: `path` must not contain a query string; declare query parameters with `query = T`
+#[lucyd_http(method = "GET", path = "/api/scores?limit=10")]
+async fn bad() {}
 ```
+
+---
+
+### Query parameters
+
+`query = T` declares the query string as a type, the same way `request` and `response` declare bodies. `T` derives `JsonSchema`, and schemars supplies the parameter names, their types, and their doc comments; whether a field is `Option<T>` is what makes the parameter optional or required.
+
+```rust
+use axum::extract::Query;
+use lucyd::lucyd_http;
+use schemars::JsonSchema;
+use serde::Deserialize;
+
+#[derive(Deserialize, JsonSchema)]
+pub struct ScoreFilters {
+    /// Board the scores belong to.
+    pub board: String,
+    /// Maximum number of rows returned.
+    pub limit: Option<u32>,
+}
+
+#[lucyd_http(
+    method   = "GET",
+    path     = "/api/scores",
+    query    = ScoreFilters,
+    response = Scores,
+)]
+async fn scores(Query(filters): Query<ScoreFilters>) -> axum::Json<Scores> { /* ... */ }
+```
+
+The declaration is not wired into the handler for you: `Query<ScoreFilters>` in the signature is what actually parses the query string. The macro documents it, and nothing more — exactly as `request = T` documents a body that `Json<T>` extracts.
+
+What the declaration buys:
+
+- **`/docs` renders a typed input per parameter**, with the doc comment as help text and a `*` on the required ones, and sends them as a query string. The cURL preview shows the URL that was actually requested.
+- **`/docs/openapi.json` emits one `in: query` Parameter Object per field**, carrying `required`, `schema` and `description`. `Option<T>`'s `["integer", "null"]` is exported as a plain `integer`: absence is already stated by `required: false`.
+- **`/docs/spec.json` carries the schema** under `query_schema`, and the Models tab lists the type alongside request and response models.
+
+#### On WebSocket
+
+`#[lucyd_ws]` takes the same argument, and it matters more there. The browser `WebSocket` constructor takes only `(url, protocols)` and cannot set an `Authorization` header, so the query string is the only way to pass anything at connect time:
+
+```rust
+#[derive(Deserialize, JsonSchema)]
+pub struct ScreenAuth {
+    /// Signed JWT authorising this screen.
+    pub access_token: String,
+}
+
+#[lucyd_ws(path = "/ws/screen/{screen_id}", query = ScreenAuth)]
+async fn ws_screen(
+    ws: WebSocketUpgrade,
+    Query(auth): Query<ScreenAuth>,
+) -> impl IntoResponse { /* ... */ }
+```
+
+Because `access_token` is `String` and not `Option<String>`, axum's `Query` extractor rejects an upgrade that omits it with `400`, before `on_upgrade` runs. Declaring it is what lets `/docs` connect at all.
+
+If a bearer token is configured globally, `/docs` appends it as `?token=`. An endpoint that declares its own parameter named `token` takes precedence: the entered value is sent and nothing is injected, so the two never collide.
+
+#### Not on MQTT
+
+`#[lucyd_mqtt]` rejects `query` as an unknown argument. MQTT topics have no query string; the analogous feature is wildcard subscriptions, which `topic` already supports through `+` and `#`.
 
 ---
 
@@ -222,6 +293,7 @@ Marks an Axum WebSocket upgrade handler for documentation and interactive testin
 | `path`        | yes      | string | WebSocket upgrade path (e.g. `"/ws/events"`) |
 | `description` | no       | string | Human-readable explanation shown in the UI |
 | `tags`        | no       | string | Comma-separated group labels |
+| `query`       | no       | type path | Rust type deriving `JsonSchema`; declares the upgrade URL's query string (see [Query parameters](#query-parameters)) |
 
 #### **Example**
 
@@ -349,7 +421,8 @@ GET /docs/spec.json
       "path":        "/ws/physics",
       "protocol":    "WebSocket",
       "description": "Real-time physics event stream",
-      "tags":        ["realtime"]
+      "tags":        ["realtime"],
+      "query_schema": { "$schema": "...", "title": "StreamFilters", ... }
     },
     {
       "name":        "on_temperature",
@@ -377,8 +450,11 @@ GET /docs/spec.json
 | `method`          | `protocol == "Http"` |
 | `description`     | `description = "…"` was provided |
 | `tags`            | at least one tag was provided |
+| `query_schema`    | `query = MyType` was provided (`#[lucyd_http]` / `#[lucyd_ws]` only) |
 | `request_schema`  | `request = MyType` was provided |
 | `response_schema` | `response = MyType` was provided |
+
+`query_schema` is an object schema with one property per query parameter; the ones listed in its `required` array are the mandatory ones. `version` was **not** bumped when it was added: an endpoint that declares no `query = T` serialises byte-identically to before, so a UI bundle built against `0.1.0` reads the newer document unchanged.
 
 ---
 
@@ -411,11 +487,21 @@ OpenAPI 3.1 has no native object for a WebSocket upgrade or an MQTT topic. Two d
   "openapi": "3.1.0",
   "info": { "title": "Lucyd API", "version": "0.2.0" },
   "paths": {
-    "/api/users": {
+    "/api/users/{id}": {
       "post": {
         "operationId": "create_user",
         "description": "Create a new user account",
         "tags": ["users"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "notify",
+            "in": "query",
+            "required": false,
+            "description": "Send a welcome email.",
+            "schema": { "type": "boolean" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -447,6 +533,7 @@ OpenAPI 3.1 has no native object for a WebSocket upgrade or an MQTT topic. Two d
 ```
 
 - **Schema hoisting & naming.** Every request/response JSON Schema is hoisted into `components.schemas` and referenced with `$ref`. Each schema is named after its `title` (falling back to `{endpoint}_request` / `{endpoint}_response` when no title is present), and identical schemas are de-duplicated document-wide; conflicting schemas that share a name are suffixed (`Name_2`, `Name_3`, ...).
+- **`parameters`.** Path parameters come from the `{name}` segments of `path`, and are always typed `string`. Query parameters come from `query = T` — one Parameter Object per property of its schema, in alphabetical order, carrying the property's `description` and whether the schema's `required` array lists it. Unlike a request or response type, a query type is **inlined** into its Parameter Objects rather than hoisted: only the named types it `$ref`s (an enum, say) reach `components.schemas`, so no orphan entry is left behind. An `Option<T>` field exports as `required: false` with its plain type — schemars' `["integer", "null"]` union is collapsed, since a query string cannot carry a JSON `null` and `required` already says the parameter may be absent. The key is omitted entirely when an endpoint has neither kind.
 - **`info` defaults.** `info.title` and `info.version` currently default to fixed values (`"Lucyd API"` and the crate's own version). They are not yet user-configurable.
 - **No security schemes.** Lucyd carries no auth metadata in its endpoint registry today, so `components.securitySchemes` and operation-level `security` are always omitted (no placeholder data is invented).
 
@@ -517,6 +604,7 @@ The Lucyd UI at `/docs` is an interactive API explorer similar to Swagger UI.
 
 - **Collapsible cards** per endpoint, grouped by tag
 - **Path parameters**: auto-detected from `{param}` placeholders, with individual inputs
+- **Query parameters**: declared with `query = T`, rendered in the same table with their type, doc comment and a `*` on the required ones, and appended to the request URL
 - **Request body**: editable textarea pre-filled with a typed example derived from the request schema
 - **Execute**: sends the request from the browser and displays the response with status code and latency
 - **cURL preview**: always-visible, updates live as inputs or body change
@@ -525,6 +613,7 @@ The Lucyd UI at `/docs` is an interactive API explorer similar to Swagger UI.
 ### WebSocket endpoints
 
 - **Connect / Disconnect** per endpoint with status indicator
+- **Query parameters**: declared with `query = T` and merged into the upgrade URL — the only channel a browser has at connect time, since the `WebSocket` constructor cannot set headers
 - **Message textarea**: pre-filled with a placeholder, `Ctrl+Enter` to send
 - **Message log**: incoming (`←`) and outgoing (`→`) messages with timestamps
 - **Error display**: RFC 6455 close codes mapped to human-readable descriptions (e.g. `1008 → Policy violation, check auth`)
@@ -546,11 +635,11 @@ Click **Authorize** in the top-right corner to configure global authentication a
 | API Key      | `<custom-header>: <key>` |
 | Basic Auth   | `Authorization: Basic <base64>` |
 
-Auth is persisted in `localStorage` across page reloads. For WebSocket endpoints, a bearer token is forwarded as `?token=<value>` in the URL.
+Auth is persisted in `localStorage` across page reloads. For WebSocket endpoints, a bearer token is forwarded as `?token=<value>` in the URL — unless the endpoint declares its own `token` query parameter, in which case the value you entered is sent and nothing is injected.
 
 ### Models tab
 
-Lists all unique JSON Schemas collected from `request_schema` and `response_schema` across all endpoints, with "Example Value" and "Schema" tabs per model.
+Lists all unique JSON Schemas collected from `query_schema`, `request_schema` and `response_schema` across all endpoints, with "Example Value" and "Schema" tabs per model.
 
 ---
 
@@ -755,7 +844,8 @@ The same split applies elsewhere: `lucyd-macro` validates attribute arguments an
 | **Axum catch-all path segments (`{*name}`) get no OpenAPI parameter**: OpenAPI's path templating has no wildcard/remainder-of-path equivalent, so such segments are silently omitted from `parameters` rather than emitting an invalid entry. | By design |
 | **`cargo xtask import-openapi` only resolves same-document `$ref`s**: a `$ref` pointing outside `#/...` (a separate file, a URL) causes that one operation to be skipped with a reason; the rest of the import still runs. | By design (v0.2) |
 | **`oneOf`/`allOf`/`anyOf`/`not`, and `callbacks`/`links`, are skipped by the importer**: none of these compose into a single Rust type (or, for `callbacks`/`links`, aren't handlers at all); the affected operation is skipped with a warning rather than guessed at. | By design |
-| **Imported path/query parameters are a doc comment, not a bound struct**: `#[lucyd_http]` has no argument for them (only `request`/`response` bind to the JSON body), so generating an unwired `{Op}Params` struct would just be dead code; parameter names are listed in a `/// Path parameters: ...` / `/// Query parameters: ...` doc line on the stub instead. | By design |
+| **Imported path parameters are a doc comment, not a bound struct**: the path template already names them, and `#[lucyd_http]` has no argument that binds them, so they are listed in a `/// Path parameters: ...` doc line on the stub. Query parameters are no longer in this row — they import as a generated `{Op}Params` struct bound by `query = T`. | By design |
+| **A declared query parameter is documented, not extracted**: `query = T` describes the query string for the UI and the OpenAPI export; parsing it is still `Query<T>`'s job in the handler signature, exactly as `request = T` describes a body that `Json<T>` extracts. Nothing checks that the two agree. | By design |
 | **The importer ignores security schemes entirely**: same stance as the OpenAPI export: `#[lucyd_http]` models no auth today, so there is nothing to import, not a dropped field. | Planned |
 | **`lucyd diff` reads documents from disk only**: there is no `--from https://...`. Fetching a spec is `curl`'s job, and building an HTTP client into the tool would drag in TLS, proxies, redirects and auth for something one pipe already does. Export first, then diff. | By design |
 | **`oneOf`/`allOf`/`anyOf` are compared as written, not composed first**: two schemas that describe the same contract through different composition (an inlined `allOf` against its flattened equivalent) are reported as a difference. Normalising them means implementing schema composition, which is a much larger piece of work than the rest of the diff put together. | By design (v0.2) |
@@ -849,6 +939,35 @@ pub async fn create_user() -> axum::Json<CreateUserResponse> {
 
 The stub is deliberately parameter-less: wiring up the request-body extractor is left to whoever implements the handler, since the stub's only job is to compile and carry accurate metadata.
 
+#### Query parameters
+
+An operation's `in: query` parameters are folded into one `{Op}Params` struct and bound with `query = {Op}Params`. Each parameter becomes a field: its `schema` decides the Rust type, its `description` becomes the field's doc comment, and a parameter that is not `required: true` becomes an `Option<T>`. A parameter declared without a `schema` at all becomes a `String` — it arrives as text in the URL either way.
+
+```yaml
+    get:
+      operationId: list_scores
+      parameters:
+        - { name: board, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, description: Maximum rows., schema: { type: integer } }
+```
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ListScoresParams {
+    pub board: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+}
+
+/// operationId: list_scores
+#[lucyd_http(method = "GET", path = "/api/scores", query = ListScoresParams)]
+pub async fn list_scores() {
+    todo!("Implement handler")
+}
+```
+
+Like the request body, the struct is documented but not extracted: add `Query(params): Query<ListScoresParams>` to the signature when you implement the handler. Path parameters stay a `/// Path parameters: ...` doc line — the path template already names them, and no macro argument binds them.
+
 ### Incremental merge: re-running is safe
 
 Re-running the importer against an updated spec merges into the existing `--out` file rather than overwriting it. The reconciliation is keyed on the `/// operationId: {id}` doc comment above each stub, not the function's name specifically so a handler can be renamed by hand (`create_user` → `handle_create_user`) without a later re-import reporting a spurious remove-then-add for what is still the same operation. A plain `//` comment can't serve this role: it isn't a token in Rust's grammar, so `syn` drops it on parse and it wouldn't survive a parse → merge → re-emit round trip, whereas a `///` doc comment desugars to a real `#[doc = "..."]` attribute that does.
@@ -880,7 +999,7 @@ The `Finished with warnings.` line only appears when at least one operation was 
 
 **Consumer dependencies.** Generated code assumes the target project already depends on `lucyd`, `schemars`, `serde` (with the `derive` feature), and `axum`, processes the same peer dependencies listed in [§1, Installation](#1-installation). A schema with no fixed `properties` (or no recognized `type` at all) maps to `serde_json::Value` / `HashMap<String, serde_json::Value>`, so `serde_json` should be added too if your spec has any free-form objects.
 
-See [§11, Known limitations](#11-known-limitations-v02) for the importer's own scoping limits ($ref resolution, `oneOf`/`allOf`/`anyOf`, parameters, security schemes, hand-added `use` statements).
+See [§11, Known limitations](#11-known-limitations-v02) for the importer's own scoping limits ($ref resolution, `oneOf`/`allOf`/`anyOf`, path parameters, security schemes, hand-added `use` statements).
 
 ---
 

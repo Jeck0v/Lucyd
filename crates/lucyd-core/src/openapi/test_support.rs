@@ -24,6 +24,25 @@ pub(super) fn simple_schema(title: &str) -> Value {
     })
 }
 
+/// A schemars-style query schema: one required `String`, one documented
+/// `Option<u32>` (hence the `["integer", "null"]` union schemars emits).
+pub(super) fn query_schema() -> Value {
+    json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "ScoreFilters",
+        "type": "object",
+        "required": ["board"],
+        "properties": {
+            "board": { "type": "string" },
+            "limit": {
+                "description": "Maximum number of rows returned.",
+                "type": ["integer", "null"],
+                "format": "uint32"
+            }
+        }
+    })
+}
+
 /// Same shape as [`simple_schema`] but with different content.
 pub(super) fn simple_schema_variant(title: &str) -> Value {
     json!({

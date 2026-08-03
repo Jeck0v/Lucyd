@@ -2,10 +2,20 @@ import { useState, useRef, useEffect, useId } from 'react'
 import type { EndpointMeta } from '../types'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAuth } from '../context/AuthContext'
+import { appendQueryString, extractQueryParams } from '../utils/queryParams'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Query parameter name the configured bearer token is injected under.
+ *
+ * The browser `WebSocket` constructor takes only `(url, protocols)` and cannot
+ * set an `Authorization` header, so the query string is the only channel left
+ * for a token.
+ */
+const AUTH_TOKEN_PARAM = 'token'
 
 function extractPathParams(path: string): string[] {
   return [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? '')
@@ -17,14 +27,33 @@ function resolvePath(path: string, params: Record<string, string>): string {
   )
 }
 
-function buildWsUrl(resolvedPath: string, bearerToken?: string): string {
+/**
+ * Builds the upgrade URL from the resolved path, the endpoint's own declared
+ * query parameters, and the injected bearer token.
+ *
+ * An endpoint that declares a parameter named `token` gets its own value: the
+ * declaration is explicit and typed, the injection is a convenience. Injecting
+ * as well would send `?token=a&token=b`, which most servers read as whichever
+ * one they happen to parse first.
+ */
+function buildWsUrl(
+  resolvedPath: string,
+  queryValues: Array<[string, string]>,
+  bearerToken?: string,
+): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const base = `${proto}//${location.host}${resolvedPath}`
-  if (bearerToken && bearerToken.trim() !== '') {
-    const sep = resolvedPath.includes('?') ? '&' : '?'
-    return `${base}${sep}token=${encodeURIComponent(bearerToken.trim())}`
-  }
-  return base
+  const supplied = queryValues.filter(([, value]) => value.trim() !== '')
+  const injected: Array<[string, string]> =
+    bearerToken !== undefined &&
+    bearerToken.trim() !== '' &&
+    !supplied.some(([name]) => name === AUTH_TOKEN_PARAM)
+      ? [[AUTH_TOKEN_PARAM, bearerToken.trim()]]
+      : []
+
+  return appendQueryString(`${proto}//${location.host}${resolvedPath}`, [
+    ...supplied,
+    ...injected,
+  ])
 }
 
 // ---------------------------------------------------------------------------
@@ -48,11 +77,15 @@ interface WsEndpointCardProps {
 export function WsEndpointCard({ endpoint }: WsEndpointCardProps): React.JSX.Element {
   const uid = useId()
   const pathParams = extractPathParams(endpoint.path)
+  const queryParams = extractQueryParams(endpoint.query_schema)
   const { auth } = useAuth()
 
   const [expanded, setExpanded] = useState(false)
   const [paramValues, setParamValues] = useState<Record<string, string>>(
     Object.fromEntries(pathParams.map((p) => [p, ''])),
+  )
+  const [queryValues, setQueryValues] = useState<Record<string, string>>(
+    Object.fromEntries(queryParams.map((p) => [p.name, ''])),
   )
   const [messageInput, setMessageInput] = useState('')
 
@@ -69,14 +102,17 @@ export function WsEndpointCard({ endpoint }: WsEndpointCardProps): React.JSX.Ele
     setParamValues((prev) => ({ ...prev, [param]: value }))
   }
 
+  function handleQueryChange(param: string, value: string): void {
+    setQueryValues((prev) => ({ ...prev, [param]: value }))
+  }
+
   function handleConnect(): void {
     const resolvedPath = resolvePath(endpoint.path, paramValues)
     // Browser WebSocket APIs do not support custom headers. When a bearer
     // token is configured, it is forwarded via the `?token=` query parameter
     // instead (the server must read it from there).
     const bearerToken = auth.type === 'bearer' ? auth.bearer : undefined
-    const url = buildWsUrl(resolvedPath, bearerToken)
-    connect(url)
+    connect(buildWsUrl(resolvedPath, Object.entries(queryValues), bearerToken))
   }
 
   function handleSend(): void {
@@ -91,6 +127,7 @@ export function WsEndpointCard({ endpoint }: WsEndpointCardProps): React.JSX.Ele
 
   const isConnected = status === 'connected'
   const isConnecting = status === 'connecting'
+  const declaresAuthParam = queryParams.some((p) => p.name === AUTH_TOKEN_PARAM)
 
   const headerId = `ws-card-header-${uid}`
   const bodyId = `ws-card-body-${uid}`
@@ -149,6 +186,38 @@ export function WsEndpointCard({ endpoint }: WsEndpointCardProps): React.JSX.Ele
             </section>
           )}
 
+          {/* Query parameters */}
+          {queryParams.length > 0 && (
+            <section className="form-section">
+              <h3 className="form-section__title">
+                <span className="form-section__badge">Query Parameters</span>
+              </h3>
+              {queryParams.map((param) => (
+                <div key={param.name} className="form-group">
+                  <label className="form-label" htmlFor={`${uid}-ws-query-${param.name}`}>
+                    {param.name}
+                    {param.required && (
+                      <span className="param-required" aria-label="required">*</span>
+                    )}
+                    <span className="param-type">{param.type}</span>
+                  </label>
+                  {param.description !== undefined && (
+                    <p className="param-description">{param.description}</p>
+                  )}
+                  <input
+                    id={`${uid}-ws-query-${param.name}`}
+                    className="form-input"
+                    type="text"
+                    placeholder={param.name}
+                    value={queryValues[param.name] ?? ''}
+                    onChange={(e) => handleQueryChange(param.name, e.target.value)}
+                    disabled={isConnected || isConnecting}
+                  />
+                </div>
+              ))}
+            </section>
+          )}
+
           {/* Auth info */}
           {auth.type === 'bearer' && (
             <section className="form-section">
@@ -156,7 +225,10 @@ export function WsEndpointCard({ endpoint }: WsEndpointCardProps): React.JSX.Ele
                 <span className="form-section__badge">Authorization</span>
               </h3>
               <p className="auth-info-label">
-                Bearer token will be appended as <code>?token=</code> query parameter.
+                {declaresAuthParam
+                  ? <>This endpoint declares its own <code>token</code> parameter; the value
+                     entered above is sent, and the global bearer token is not injected.</>
+                  : <>Bearer token will be appended as <code>?token=</code> query parameter.</>}
               </p>
             </section>
           )}

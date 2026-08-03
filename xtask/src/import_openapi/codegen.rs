@@ -28,6 +28,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 "#;
 
+/// The Rust types one operation's schemas were generated into, each `None`
+/// when the operation declared no such schema.
+#[derive(Default)]
+struct OperationTypes {
+    /// From the folded `in: query` parameters; bound by `query = T`.
+    query: Option<syn::Type>,
+    request: Option<syn::Type>,
+    response: Option<syn::Type>,
+}
+
 /// The freshly generated (not yet merged with an existing file) contents.
 pub struct GeneratedFile {
     /// Inner (`#![...]`) attributes of the fixed header.
@@ -54,19 +64,8 @@ pub fn generate(document: &Value, operations: &[ImportOperation]) -> Result<Gene
             continue;
         }
 
-        let pascal_id = rust_type::to_pascal_case(&operation.operation_id);
-        let request_type = operation
-            .request_schema
-            .as_ref()
-            .map(|schema| generator.generate_type(schema, &format!("{pascal_id}Request")))
-            .transpose()?;
-        let response_type = operation
-            .response_schema
-            .as_ref()
-            .map(|schema| generator.generate_type(schema, &format!("{pascal_id}Response")))
-            .transpose()?;
-
-        let item_fn = build_operation_fn(operation, request_type.as_ref(), response_type.as_ref());
+        let types = operation_types(&mut generator, operation)?;
+        let item_fn = build_operation_fn(operation, &types);
         operation_fns.push((operation.operation_id.clone(), item_fn));
     }
 
@@ -103,20 +102,54 @@ fn header_file() -> syn::File {
     syn::parse_file(HEADER_TEMPLATE).expect("HEADER_TEMPLATE must be valid Rust")
 }
 
+/// Generates the Rust type behind each of an operation's schemas, naming them
+/// `{Op}Params`, `{Op}Request` and `{Op}Response`.
+fn operation_types(
+    generator: &mut TypeGenerator<'_>,
+    operation: &ImportOperation,
+) -> Result<OperationTypes, String> {
+    let id = rust_type::to_pascal_case(&operation.operation_id);
+
+    Ok(OperationTypes {
+        query: named_type(
+            generator,
+            operation.query_schema.as_ref(),
+            &format!("{id}Params"),
+        )?,
+        request: named_type(
+            generator,
+            operation.request_schema.as_ref(),
+            &format!("{id}Request"),
+        )?,
+        response: named_type(
+            generator,
+            operation.response_schema.as_ref(),
+            &format!("{id}Response"),
+        )?,
+    })
+}
+
+/// Generates a type for a schema the operation may not have declared.
+fn named_type(
+    generator: &mut TypeGenerator<'_>,
+    schema: Option<&Value>,
+    hint: &str,
+) -> Result<Option<syn::Type>, String> {
+    schema
+        .map(|schema| generator.generate_type(schema, hint))
+        .transpose()
+}
+
 /// Builds one `#[lucyd_http(...)]`-annotated stub function. The signature is
 /// deliberately parameter-less — wiring an extractor for the request body is
 /// left to the developer implementing the handler; the stub only needs to
 /// compile and carry accurate metadata.
-fn build_operation_fn(
-    operation: &ImportOperation,
-    request_type: Option<&syn::Type>,
-    response_type: Option<&syn::Type>,
-) -> syn::ItemFn {
+fn build_operation_fn(operation: &ImportOperation, types: &OperationTypes) -> syn::ItemFn {
     let doc_attrs = doc_comment_attrs(operation);
-    let http_attr = lucyd_http_attr(operation, request_type, response_type);
+    let http_attr = lucyd_http_attr(operation, types);
     let fn_ident = format_ident!("{}", rust_type::to_snake_case(&operation.operation_id));
 
-    let return_type = match response_type {
+    let return_type = match &types.response {
         Some(ty) => quote! { -> axum::Json<#ty> },
         None => quote! {},
     };
@@ -133,7 +166,11 @@ fn build_operation_fn(
 
 /// Builds the `/// operationId: ...` marker doc comment — load-bearing, see
 /// `merge.rs` for why re-imports match on this attribute rather than the fn
-/// name — plus optional path/query parameter doc lines.
+/// name — plus an optional path parameter doc line.
+///
+/// Query parameters used to get a doc line of their own; they are now bound to
+/// a generated struct through `query = {Op}Params` instead, so restating them
+/// here would only duplicate what the attribute says.
 fn doc_comment_attrs(operation: &ImportOperation) -> Vec<proc_macro2::TokenStream> {
     let mut attrs = Vec::new();
 
@@ -149,10 +186,6 @@ fn doc_comment_attrs(operation: &ImportOperation) -> Vec<proc_macro2::TokenStrea
         let line = format!(" Path parameters: {}", operation.path_params.join(", "));
         attrs.push(quote! { #[doc = #line] });
     }
-    if !operation.query_params.is_empty() {
-        let line = format!(" Query parameters: {}", operation.query_params.join(", "));
-        attrs.push(quote! { #[doc = #line] });
-    }
 
     attrs
 }
@@ -162,8 +195,7 @@ fn doc_comment_attrs(operation: &ImportOperation) -> Vec<proc_macro2::TokenStrea
 /// already treats `description`/`tags`/`request`/`response` as optional.
 fn lucyd_http_attr(
     operation: &ImportOperation,
-    request_type: Option<&syn::Type>,
-    response_type: Option<&syn::Type>,
+    types: &OperationTypes,
 ) -> proc_macro2::TokenStream {
     let method = &operation.method;
     let path = &operation.path;
@@ -177,10 +209,13 @@ fn lucyd_http_attr(
         let tags = operation.tags.join(", ");
         args.push(quote! { tags = #tags });
     }
-    if let Some(ty) = request_type {
+    if let Some(ty) = &types.query {
+        args.push(quote! { query = #ty });
+    }
+    if let Some(ty) = &types.request {
         args.push(quote! { request = #ty });
     }
-    if let Some(ty) = response_type {
+    if let Some(ty) = &types.response {
         args.push(quote! { response = #ty });
     }
 
@@ -200,7 +235,7 @@ mod tests {
             description: None,
             tags: Vec::new(),
             path_params: Vec::new(),
-            query_params: Vec::new(),
+            query_schema: None,
             request_schema: None,
             response_schema: None,
             skip_reason: None,
@@ -261,5 +296,51 @@ mod tests {
         assert!(rendered.contains("response = CreateUserResponse"));
         assert!(rendered.contains("axum :: Json < CreateUserResponse >"));
         assert_eq!(generated.structs.len(), 2);
+    }
+
+    #[test]
+    fn query_parameters_become_a_params_struct_bound_by_the_attribute() {
+        let document = json!({ "openapi": "3.1.0", "paths": {} });
+        let mut op = operation("list_scores");
+        op.query_schema = Some(json!({
+            "type": "object",
+            "properties": {
+                "board": { "type": "string" },
+                "limit": { "type": "integer", "description": "Maximum rows." }
+            },
+            "required": ["board"]
+        }));
+
+        let generated = generate(&document, &[op]).expect("generation must succeed");
+        let (_, item_fn) = &generated.operation_fns[0];
+        let rendered = quote! { #item_fn }.to_string();
+
+        assert!(
+            rendered.contains("query = ListScoresParams"),
+            "query parameters must be bound, not downgraded to a doc comment: {rendered}"
+        );
+        assert!(
+            !rendered.contains("Query parameters:"),
+            "the doc-comment downgrade this replaces must be gone: {rendered}"
+        );
+
+        assert_eq!(generated.structs.len(), 1);
+        let struct_tokens = {
+            let item = &generated.structs[0];
+            quote! { #item }.to_string()
+        };
+        assert!(struct_tokens.contains("pub struct ListScoresParams"));
+        assert!(
+            struct_tokens.contains("pub board : String"),
+            "a required parameter must be a plain field: {struct_tokens}"
+        );
+        assert!(
+            struct_tokens.contains("pub limit : Option < i64 >"),
+            "an optional parameter must be an Option: {struct_tokens}"
+        );
+        assert!(
+            struct_tokens.contains("JsonSchema"),
+            "the struct must derive JsonSchema for `query = T` to generate a schema"
+        );
     }
 }
