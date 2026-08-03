@@ -4,8 +4,11 @@
 //! This test lives in the `lucyd` crate (not `lucyd-macro`) so that `::lucyd`
 //! resolves correctly in the code emitted by the proc-macro.
 
-use lucyd::lucyd_http;
+use lucyd::{lucyd_http, lucyd_ws};
 use lucyd_core::registry::global_registry;
+use lucyd_types::endpoint::EndpointMeta;
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 #[allow(dead_code)]
 #[lucyd_http(
@@ -37,6 +40,50 @@ mod deprecated_spelling {
     async fn legacy_handler() -> &'static str {
         "ok"
     }
+}
+
+/// The query string of the WebSocket below.
+///
+/// Required, and deliberately *not* named `token`: an endpoint whose auth
+/// parameter happens to be called `token` connects from `/docs` by coincidence
+/// of the console's hardcoded injection. This one only connects if the declared
+/// parameter actually reaches the UI.
+#[derive(Deserialize, JsonSchema)]
+#[allow(dead_code)]
+struct ScreenAuth {
+    /// Signed JWT authorising this screen.
+    access_token: String,
+}
+
+#[allow(dead_code)]
+#[lucyd_ws(
+    path = "/ws/screen",
+    description = "Per-screen stream, authenticated by query parameter",
+    query = ScreenAuth
+)]
+async fn ws_screen() {}
+
+#[allow(dead_code)]
+#[lucyd_http(
+    method = "GET",
+    path = "/api/scores",
+    description = "query-parameter integration endpoint",
+    query = ScreenAuth
+)]
+async fn scores() -> &'static str {
+    "[]"
+}
+
+/// Looks an endpoint up by path in the global registry.
+fn endpoint_at(path: &str) -> EndpointMeta {
+    global_registry()
+        .lock()
+        .expect("registry lock must not be poisoned")
+        .all()
+        .iter()
+        .find(|endpoint| endpoint.path == path)
+        .cloned()
+        .unwrap_or_else(|| panic!("endpoint '{path}' must be registered"))
 }
 
 #[test]
@@ -73,4 +120,43 @@ fn the_deprecated_macro_name_still_registers_its_endpoint() {
         .expect("a deprecated macro must still do its job, not just compile");
 
     assert_eq!(found.method.as_deref(), Some("POST"));
+}
+
+#[test]
+fn a_query_argument_reaches_the_registry_as_a_json_schema() {
+    let schema = endpoint_at("/api/scores")
+        .query_schema
+        .expect("`query = T` must produce a schema");
+
+    assert_eq!(schema["properties"]["access_token"]["type"], "string");
+    assert_eq!(
+        schema["required"],
+        serde_json::json!(["access_token"]),
+        "a non-Option field must come through as a required parameter"
+    );
+    assert_eq!(
+        schema["properties"]["access_token"]["description"], "Signed JWT authorising this screen.",
+        "the field's doc comment must survive as the parameter description"
+    );
+}
+
+#[test]
+fn a_websocket_can_declare_a_required_query_parameter_of_any_name() {
+    // The regression the console's hardcoded `?token=` injection used to hide:
+    // a WebSocket whose required parameter is named anything else was
+    // unreachable from `/docs`, because nothing declared it.
+    let schema = endpoint_at("/ws/screen")
+        .query_schema
+        .expect("`query = T` must work on `#[lucyd_ws]`, not just `#[lucyd_http]`");
+
+    assert_eq!(schema["properties"]["access_token"]["type"], "string");
+    assert_eq!(schema["required"], serde_json::json!(["access_token"]));
+}
+
+#[test]
+fn an_endpoint_without_a_query_argument_declares_no_query_schema() {
+    assert!(
+        endpoint_at("/integration-test").query_schema.is_none(),
+        "omitting `query` must leave the field absent, not empty"
+    );
 }

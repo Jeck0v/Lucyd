@@ -518,6 +518,21 @@ code, pre, .monospace {
   border-radius: var(--radius-sm);
 }
 
+/* Where the value goes: `(path)` or `(query)`. */
+.param-in {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-left: 0.375rem;
+}
+
+/* The Rust field's doc comment, under the parameter name. */
+.param-description {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
 /* =====================================================================
    Request body section — Swagger style
    ===================================================================== */

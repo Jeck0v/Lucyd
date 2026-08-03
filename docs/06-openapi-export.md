@@ -29,11 +29,21 @@ OpenAPI 3.1 has no native object for a WebSocket upgrade or an MQTT topic. Two d
   "openapi": "3.1.0",
   "info": { "title": "Lucyd API", "version": "0.2.0" },
   "paths": {
-    "/api/users": {
+    "/api/users/{id}": {
       "post": {
         "operationId": "create_user",
         "description": "Create a new user account",
         "tags": ["users"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "notify",
+            "in": "query",
+            "required": false,
+            "description": "Send a welcome email.",
+            "schema": { "type": "boolean" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -65,6 +75,7 @@ OpenAPI 3.1 has no native object for a WebSocket upgrade or an MQTT topic. Two d
 ```
 
 - **Schema hoisting & naming.** Every request/response JSON Schema is hoisted into `components.schemas` and referenced with `$ref`. Each schema is named after its `title` (falling back to `{endpoint}_request` / `{endpoint}_response` when no title is present), and identical schemas are de-duplicated document-wide; conflicting schemas that share a name are suffixed (`Name_2`, `Name_3`, ...).
+- **`parameters`.** Path parameters come from the `{name}` segments of `path`, and are always typed `string`. Query parameters come from `query = T` — one Parameter Object per property of its schema, in alphabetical order, carrying the property's `description` and whether the schema's `required` array lists it. Unlike a request or response type, a query type is **inlined** into its Parameter Objects rather than hoisted: only the named types it `$ref`s (an enum, say) reach `components.schemas`, so no orphan entry is left behind. An `Option<T>` field exports as `required: false` with its plain type — schemars' `["integer", "null"]` union is collapsed, since a query string cannot carry a JSON `null` and `required` already says the parameter may be absent. The key is omitted entirely when an endpoint has neither kind.
 - **`info` defaults.** `info.title` and `info.version` currently default to fixed values (`"Lucyd API"` and the crate's own version). They are not yet user-configurable.
 - **No security schemes.** Lucyd carries no auth metadata in its endpoint registry today, so `components.securitySchemes` and operation-level `security` are always omitted (no placeholder data is invented).
 

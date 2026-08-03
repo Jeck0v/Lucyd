@@ -58,6 +58,23 @@ pub fn require(value: Option<LitStr>, name: &str, span: Span) -> syn::Result<Lit
     value.ok_or_else(|| syn::Error::new(span, format!("missing required `{name}` argument")))
 }
 
+/// Rejects a `path` that carries a query string of its own.
+///
+/// Writing `path = "/api/scores?limit=10"` would corrupt the OpenAPI path
+/// template and, more seriously, break endpoint identity in `lucyd diff`, whose
+/// `path_template()` splits on `/` and would fold `?limit=10` into the final
+/// segment — the endpoint would stop matching itself across two documents.
+/// Query parameters are declared with `query = T` instead.
+pub fn reject_query_string(path: &LitStr) -> syn::Result<()> {
+    if path.value().contains('?') {
+        return Err(syn::Error::new_spanned(
+            path,
+            "`path` must not contain a query string; declare query parameters with `query = T`",
+        ));
+    }
+    Ok(())
+}
+
 /// Splits a comma-separated `tags` literal into a trimmed, non-empty list.
 ///
 /// Absent `tags` (`None`) yields an empty `Vec`.

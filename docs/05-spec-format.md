@@ -29,7 +29,8 @@ GET /docs/spec.json
       "path":        "/ws/physics",
       "protocol":    "WebSocket",
       "description": "Real-time physics event stream",
-      "tags":        ["realtime"]
+      "tags":        ["realtime"],
+      "query_schema": { "$schema": "...", "title": "StreamFilters", ... }
     },
     {
       "name":        "on_temperature",
@@ -57,8 +58,11 @@ GET /docs/spec.json
 | `method`          | `protocol == "Http"` |
 | `description`     | `description = "…"` was provided |
 | `tags`            | at least one tag was provided |
+| `query_schema`    | `query = MyType` was provided (`#[lucyd_http]` / `#[lucyd_ws]` only) |
 | `request_schema`  | `request = MyType` was provided |
 | `response_schema` | `response = MyType` was provided |
+
+`query_schema` is an object schema with one property per query parameter; the ones listed in its `required` array are the mandatory ones. `version` was **not** bumped when it was added: an endpoint that declares no `query = T` serialises byte-identically to before, so a UI bundle built against `0.1.0` reads the newer document unchanged.
 
 ---
 

@@ -246,7 +246,7 @@ mod tests {
             description: None,
             tags: Vec::new(),
             path_params: Vec::new(),
-            query_params: Vec::new(),
+            query_schema: None,
             request_schema: None,
             response_schema: None,
             skip_reason: None,

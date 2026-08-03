@@ -18,6 +18,13 @@ export interface EndpointMeta {
   description?: string
   /** HTTP verb (GET, POST, etc.). Defined only for Http endpoints. */
   method?: string
+  /**
+   * JSON Schema of the query string: one property per query parameter, with
+   * the mandatory ones listed in `required`. Absent unless the endpoint
+   * declared `query = T`. Never defined for Mqtt endpoints — topics have no
+   * query string.
+   */
+  query_schema?: Record<string, unknown>
   request_schema?: Record<string, unknown>
   response_schema?: Record<string, unknown>
   /** Classification tags for grouping endpoints (e.g. ["screens", "api"]). */

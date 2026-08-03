@@ -3,6 +3,7 @@ import type { EndpointMeta } from '../types'
 import { useAuth, buildAuthHeaders } from '../context/AuthContext'
 import { SchemaViewer } from './SchemaViewer'
 import { schemaExampleJson } from '../utils/schemaToExample'
+import { appendQueryString, extractQueryParams } from '../utils/queryParams'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -214,6 +215,58 @@ function CurlDisplay({ curlCommand }: CurlDisplayProps): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
+// ParamRow — one row of the Parameters table
+// ---------------------------------------------------------------------------
+
+interface ParamRowProps {
+  uid: string
+  name: string
+  /** Where the value goes: into the path template, or the query string. */
+  location: 'path' | 'query'
+  type: string
+  required: boolean
+  description: string | undefined
+  value: string
+  onChange: (value: string) => void
+}
+
+/**
+ * Renders one parameter, whatever its location: path parameters are always
+ * required strings, query parameters carry the type and required-ness their
+ * schema declared.
+ */
+function ParamRow({
+  uid, name, location, type, required, description, value, onChange,
+}: ParamRowProps): React.JSX.Element {
+  return (
+    <tr>
+      <td>
+        <span className="param-name">
+          {name}
+          {required && <span className="param-required" aria-label="required">*</span>}
+        </span>
+        {description !== undefined && <p className="param-description">{description}</p>}
+      </td>
+      <td>
+        <span className="param-type">{type}</span>
+        <span className="param-in">({location})</span>
+      </td>
+      <td>
+        <input
+          id={`${uid}-${location}-param-${name}`}
+          className="form-input"
+          type="text"
+          placeholder={`Enter ${name}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={`${location === 'path' ? 'Path' : 'Query'} parameter: ${name}`}
+        />
+      </td>
+    </tr>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // RequestBodyEditor — Swagger-style request body section
 // ---------------------------------------------------------------------------
 
@@ -318,6 +371,7 @@ export function HttpEndpointCard({ endpoint }: HttpEndpointCardProps): React.JSX
   const uid = useId()
   const method = (endpoint.method ?? 'GET').toUpperCase()
   const pathParams = extractPathParams(endpoint.path)
+  const queryParams = extractQueryParams(endpoint.query_schema)
   const hasBody = BODY_METHODS.has(method)
 
   const { auth } = useAuth()
@@ -325,6 +379,9 @@ export function HttpEndpointCard({ endpoint }: HttpEndpointCardProps): React.JSX
   const [expanded, setExpanded] = useState(false)
   const [paramValues, setParamValues] = useState<Record<string, string>>(
     Object.fromEntries(pathParams.map((p) => [p, ''])),
+  )
+  const [queryValues, setQueryValues] = useState<Record<string, string>>(
+    Object.fromEntries(queryParams.map((p) => [p.name, ''])),
   )
 
   // Pre-fill body from request_schema when available; fall back to the generic skeleton.
@@ -343,8 +400,17 @@ export function HttpEndpointCard({ endpoint }: HttpEndpointCardProps): React.JSX
     setParamValues((prev) => ({ ...prev, [param]: value }))
   }
 
+  function handleQueryChange(param: string, value: string): void {
+    setQueryValues((prev) => ({ ...prev, [param]: value }))
+  }
+
   // Computed values — derived from current state on every render.
-  const resolvedPath = resolvePath(endpoint.path, paramValues)
+  // The query string is appended once, here, so `fetch` and the cURL preview
+  // are the same URL by construction rather than by two matching edits.
+  const resolvedPath = appendQueryString(
+    resolvePath(endpoint.path, paramValues),
+    Object.entries(queryValues),
+  )
   const authHeaders = buildAuthHeaders(auth)
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -424,8 +490,8 @@ export function HttpEndpointCard({ endpoint }: HttpEndpointCardProps): React.JSX
       {expanded && (
         <div id={bodyId} className="endpoint-card__body" role="region" aria-labelledby={headerId}>
 
-          {/* Path parameters — table layout */}
-          {pathParams.length > 0 && (
+          {/* Path and query parameters — table layout */}
+          {pathParams.length + queryParams.length > 0 && (
             <div className="endpoint-section">
               <div className="section-header">
                 <span className="section-title">Parameters</span>
@@ -440,28 +506,30 @@ export function HttpEndpointCard({ endpoint }: HttpEndpointCardProps): React.JSX
                 </thead>
                 <tbody>
                   {pathParams.map((param) => (
-                    <tr key={param}>
-                      <td>
-                        <span className="param-name">
-                          {param}
-                          <span className="param-required" aria-label="required">*</span>
-                        </span>
-                      </td>
-                      <td>
-                        <span className="param-type">string</span>
-                      </td>
-                      <td>
-                        <input
-                          id={`${uid}-param-${param}`}
-                          className="form-input"
-                          type="text"
-                          placeholder={`Enter ${param}`}
-                          value={paramValues[param] ?? ''}
-                          onChange={(e) => handleParamChange(param, e.target.value)}
-                          aria-label={`Path parameter: ${param}`}
-                        />
-                      </td>
-                    </tr>
+                    <ParamRow
+                      key={`path-${param}`}
+                      uid={uid}
+                      name={param}
+                      location="path"
+                      type="string"
+                      required
+                      description={undefined}
+                      value={paramValues[param] ?? ''}
+                      onChange={(value) => handleParamChange(param, value)}
+                    />
+                  ))}
+                  {queryParams.map((param) => (
+                    <ParamRow
+                      key={`query-${param.name}`}
+                      uid={uid}
+                      name={param.name}
+                      location="query"
+                      type={param.type}
+                      required={param.required}
+                      description={param.description}
+                      value={queryValues[param.name] ?? ''}
+                      onChange={(value) => handleQueryChange(param.name, value)}
+                    />
                   ))}
                 </tbody>
               </table>
