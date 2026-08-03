@@ -19,7 +19,7 @@ No external tools required. Annotate your handlers, run your server, open your b
 ```toml
 # Cargo.toml
 [dependencies]
-lucyd    = "0.2.0"
+lucyd    = "0.2.1"
 schemars = "0.8"
 serde    = { version = "1", features = ["derive"] }
 axum     = "0.8"
