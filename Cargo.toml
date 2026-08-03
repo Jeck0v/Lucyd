@@ -5,6 +5,7 @@ members  = [
     "crates/lucy-types",
     "crates/lucy-macro",
     "crates/lucy-core",
+    "crates/lucyd-cli",
     "xtask",
 ]
 exclude = ["ui"]
@@ -48,3 +49,15 @@ jsonschema = "0.40"
 
 # Compile-time static registration
 inventory = "0.3"
+
+# Command-line argument parsing for the `lucyd` binary
+clap = { version = "4.5", features = ["derive"] }
+
+# YAML input: OpenAPI documents come in both flavours, and both xtask and
+# lucyd-cli have to read them. Maintained fork of the archived `serde_yaml`;
+# deserializes straight into `serde_json::Value` (which implements
+# `Deserialize`) so YAML and JSON documents share one in-memory representation.
+serde_yaml_ng = "0.10"
+
+# Temporary directories for tests that need real files on disk
+tempfile = "3"
