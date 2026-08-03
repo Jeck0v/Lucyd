@@ -2,7 +2,7 @@
 
 # 7. Building the UI
 
-The interactive `/docs` UI is a React single-page app bundled into the binary at compile time. Build it once with `cargo xtask build-ui` before compiling `lucy-core` for a production profile.
+The interactive `/docs` UI is a React single-page app bundled into the binary at compile time. Build it once with `cargo xtask build-ui` before compiling `lucyd-core` for a production profile.
 
 ## CI / Docker
 

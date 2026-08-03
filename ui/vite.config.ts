@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 /**
- * Vite configuration for Lucy UI.
+ * Vite configuration for Lucyd UI.
  * Proxies spec requests to the local Rust/Axum server during development.
  */
 export default defineConfig({
@@ -10,11 +10,11 @@ export default defineConfig({
 
   // Base public path — all asset references in the built index.html will be
   // prefixed with /docs/ so the browser fetches them from the right location
-  // when the app is served at http://host/docs/ by lucy-core.
+  // when the app is served at http://host/docs/ by lucyd-core.
   base: '/docs/',
 
   build: {
-    outDir: '../crates/lucy-core/ui/dist',
+    outDir: '../crates/lucyd-core/ui/dist',
     emptyOutDir: true,
   },
   server: {

@@ -1,8 +1,8 @@
 //! `cargo xtask import-openapi <file>`: reads an OpenAPI 3.x document and
-//! generates Rust scaffolding (structs + `#[lucy_http]` handler stubs with
+//! generates Rust scaffolding (structs + `#[lucyd_http]` handler stubs with
 //! `todo!()` bodies) that bootstraps a Lucyd project from it.
 //!
-//! This is the reverse of `crates/lucy-core/src/openapi/`, which turns a
+//! This is the reverse of `crates/lucyd-core/src/openapi/`, which turns a
 //! running application's registered endpoints *into* an OpenAPI document;
 //! this module turns an OpenAPI document *into* the Rust code that would
 //! register those endpoints. Re-running it against an updated spec merges

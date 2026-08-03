@@ -28,7 +28,7 @@ pub struct ImportOperation {
     /// From `operationId`, or derived as `{method}_{path_slug}` when absent.
     pub operation_id: String,
     /// Uppercase HTTP verb (`"GET"`, `"POST"`, ...), matching what
-    /// `#[lucy_http(method = ...)]` expects.
+    /// `#[lucyd_http(method = ...)]` expects.
     pub method: String,
     /// The OpenAPI path template, e.g. `"/api/users/{id}"`.
     pub path: String,
@@ -37,7 +37,7 @@ pub struct ImportOperation {
     /// `tags`, in document order.
     pub tags: Vec<String>,
     /// Names of `in: path` parameters — surfaced as a doc comment only;
-    /// `#[lucy_http]` has no slot for parameters (only `request`/`response`
+    /// `#[lucyd_http]` has no slot for parameters (only `request`/`response`
     /// bind to the JSON body).
     pub path_params: Vec<String>,
     /// Names of `in: query` parameters — same doc-comment-only treatment.
@@ -358,7 +358,7 @@ fn schema_uses_unsupported_composition(
 
 /// Returns a document-unique `operationId`: the explicit one if present,
 /// otherwise `{method}_{path_slug}`, suffixed on collision. Mirrors
-/// `crates/lucy-core/src/openapi/paths.rs::unique_operation_id`'s
+/// `crates/lucyd-core/src/openapi/paths.rs::unique_operation_id`'s
 /// first-wins, `_2`/`_3`/... fallback pattern.
 fn unique_operation_id(
     explicit: Option<&str>,

@@ -149,7 +149,7 @@ function generateExampleBody(endpoint: EndpointMeta): string {
  * Builds a cURL command string equivalent to the given request.
  *
  * The URL is prefixed with `window.location.origin` so it targets the same
- * host as the Lucy UI, which is co-located with the Axum backend.
+ * host as the Lucyd UI, which is co-located with the Axum backend.
  */
 function buildCurl(
   method: string,

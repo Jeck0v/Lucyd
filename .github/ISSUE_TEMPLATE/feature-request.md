@@ -21,9 +21,9 @@ assignees: ""
 ## Affected Crates
 <!-- Check all that apply -->
 - [ ] `lucyd` (public facade)
-- [ ] `lucy-macro` (proc-macros)
-- [ ] `lucy-core` (runtime / spec generation)
-- [ ] `lucy-types` (shared types)
+- [ ] `lucyd-macro` (proc-macros)
+- [ ] `lucyd-core` (runtime / spec generation)
+- [ ] `lucyd-types` (shared types)
 - [ ] UI (TypeScript frontend)
 
 ## Acceptance Criteria

@@ -37,38 +37,49 @@ jobs:
       - name: Update workspace version from tag
         run: |
           sed -i "s/^version     = \".*\"/version     = \"$VERSION\"/" Cargo.toml
-          sed -i "s/\(lucy-types.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
-          sed -i "s/\(lucy-core.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
-          sed -i "s/\(lucy-macro.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
+          sed -i "s/\(lucyd-types.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
+          sed -i "s/\(lucyd-core.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
+          sed -i "s/\(lucyd-macro.*version = \)\"[^\"]*\"/\1\"$VERSION\"/" Cargo.toml
 
       - name: Create ui/dist stub for rust-embed
-        run: mkdir -p crates/lucy-core/ui/dist
+        run: mkdir -p crates/lucyd-core/ui/dist
 
+      # --all-features so the OpenAPI diff is tested before it ships. Building
+      # the workspace happens to enable it anyway, since lucyd-cli requires it,
+      # but relying on feature unification to test the code being published is
+      # a guarantee that disappears the day the dependency graph changes.
       - name: Run tests
-        run: cargo test --workspace
+        run: cargo test --workspace --all-features
 
-      - name: Publish lucy-types
-        run: cargo publish --allow-dirty -p lucy-types
+      - name: Publish lucyd-types
+        run: cargo publish --allow-dirty -p lucyd-types
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Wait for lucy-types indexing
+      - name: Wait for lucyd-types indexing
         run: sleep 30
 
-      - name: Publish lucy-core
-        run: cargo publish --allow-dirty -p lucy-core
+      - name: Publish lucyd-core
+        run: cargo publish --allow-dirty -p lucyd-core
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Publish lucy-macro
-        run: cargo publish --allow-dirty -p lucy-macro
+      - name: Publish lucyd-macro
+        run: cargo publish --allow-dirty -p lucyd-macro
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Wait for lucy-core and lucy-macro indexing
+      - name: Wait for lucyd-core and lucyd-macro indexing
         run: sleep 30
 
       - name: Publish lucyd
         run: cargo publish --allow-dirty -p lucyd
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # Only depends on lucyd-core, which the wait above already indexed, so
+      # this needs no further delay of its own.
+      - name: Publish lucyd-cli
+        run: cargo publish --allow-dirty -p lucyd-cli
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

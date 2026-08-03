@@ -1,0 +1,22 @@
+[package]
+name        = "lucyd-macro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Proc-macros for lucyd: #[lucyd_http], #[lucyd_ws], #[lucyd_mqtt] handler annotations"
+keywords    = ["axum", "proc-macro", "documentation", "websocket", "mqtt"]
+categories  = ["development-tools", "web-programming::http-server"]
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+syn         = { workspace = true }
+quote       = { workspace = true }
+lucyd-types = { workspace = true }
+inventory   = { workspace = true }
+
+[dev-dependencies]
+lucyd-core = { workspace = true }

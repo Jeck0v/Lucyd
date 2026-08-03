@@ -16,6 +16,7 @@ fn main() {
 
     let result = match command {
         Some("build-ui") => xtask::build_ui(&workspace_root),
+        Some("build-docs") => xtask::build_docs(&workspace_root),
         Some("import-openapi") => run_import_openapi(&args[1..]),
         Some(unknown) => {
             eprintln!("Unknown command: {unknown}");

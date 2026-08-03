@@ -39,9 +39,9 @@ assignees: ""
 ```
 
 ## Affected Protocol
-- [ ] HTTP (`#[lucy_http]`)
-- [ ] WebSocket (`#[lucy_ws]`)
-- [ ] MQTT (`#[lucy_mqtt]`)
+- [ ] HTTP (`#[lucyd_http]`)
+- [ ] WebSocket (`#[lucyd_ws]`)
+- [ ] MQTT (`#[lucyd_mqtt]`)
 - [ ] `/docs` UI
 - [ ] `spec.json` generation
 

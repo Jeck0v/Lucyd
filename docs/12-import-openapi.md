@@ -2,7 +2,9 @@
 
 # 12. Importing an existing OpenAPI document (`cargo xtask import-openapi`)
 
-This is the reverse of [§6, The OpenAPI export](06-openapi-export.md): instead of turning a running Lucyd application's registered endpoints *into* an OpenAPI document, `cargo xtask import-openapi` turns an existing OpenAPI 3.x document *into* the Rust scaffolding (structs + `#[lucy_http]` handler stubs) that would register those same endpoints. It exists to bootstrap a Lucyd project from a spec you already have,a legacy backend's contract, a spec handed to you by another team, or one exported by a different framework, rather than hand-transcribing every operation.
+This is the reverse of [§6, The OpenAPI export](06-openapi-export.md): instead of turning a running Lucyd application's registered endpoints *into* an OpenAPI document, `cargo xtask import-openapi` turns an existing OpenAPI 3.x document *into* the Rust scaffolding (structs + `#[lucyd_http]` handler stubs) that would register those same endpoints. It exists to bootstrap a Lucyd project from a spec you already have (a legacy backend's contract, a spec handed to you by another team, or one exported by a different framework) rather than hand-transcribing every operation.
+
+Once the stubs are implemented, [§13, Validating a migration](13-openapi-diff.md) is how you prove the result still matches the spec you started from.
 
 ```bash
 cargo xtask import-openapi <file> [--out <path>] [--remove-orphaned]
@@ -18,7 +20,7 @@ cargo xtask import-openapi <file> [--out <path>] [--remove-orphaned]
 
 - One `struct` per JSON Schema object encountered (named after its `components.schemas` entry, `{Op}Request`/`{Op}Response` when inline, or `{Parent}{Field}` for a nested inline object), deriving `Debug, Clone, Serialize, Deserialize, JsonSchema`. A `$ref`'d component referenced by several operations is only ever generated once and reused.
 - One fieldless `enum` per `string` schema carrying an `enum` list, with `#[serde(rename = "...")]` on any variant whose PascalCased name differs from the original value.
-- One `#[lucy_http(...)]`-annotated `async fn` stub per operation, with a `todo!("Implement handler")` body, named from `operationId` (or `{method}_{path_slug}` when absent, e.g. `get_api_users_id`) converted to `snake_case`.
+- One `#[lucyd_http(...)]`-annotated `async fn` stub per operation, with a `todo!("Implement handler")` body, named from `operationId` (or `{method}_{path_slug}` when absent, e.g. `get_api_users_id`) converted to `snake_case`.
 
 ## Before
 
@@ -51,7 +53,7 @@ paths:
 ## After (`src/generated_endpoints.rs`)
 
 ```rust
-use lucyd::lucy_http;
+use lucyd::lucyd_http;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -68,7 +70,7 @@ pub struct CreateUserResponse {
 }
 
 /// operationId: create_user
-#[lucy_http(
+#[lucyd_http(
     method = "POST",
     path = "/api/users",
     description = "Create a new user",
@@ -90,7 +92,7 @@ Re-running the importer against an updated spec merges into the existing `--out`
 ### On each run:
 
 - **Added**: an operation in `<file>` with no matching marker in `--out` gets a brand-new stub appended.
-- **Updated**: an operation whose marker is found gets its `#[lucy_http(...)]` attribute, signature, and associated struct/enum definitions refreshed from the current spec. Its handler body is only overwritten when it is still *exactly* the generated `todo!(...)` call; any other body (i.e. one you've started implementing) is preserved byte-for-byte.
+- **Updated**: an operation whose marker is found gets its `#[lucyd_http(...)]` attribute, signature, and associated struct/enum definitions refreshed from the current spec. Its handler body is only overwritten when it is still *exactly* the generated `todo!(...)` call; any other body (i.e. one you've started implementing) is preserved byte-for-byte.
 - **Removed**: a marker in `--out` with no matching operation in the current `<file>` is always reported. By default the handler and its code are left in place (non-destructive); pass `--remove-orphaned` to physically delete it, along with any struct/enum it (or another now-removed operation) needed that the current spec no longer generates.
 - **Unchanged**: nothing to report.
 - **Skipped**: an operation the importer can't safely represent (see [§11, Known limitations](11-limitations.md)); always reported with a reason, never silently dropped.
@@ -118,4 +120,4 @@ See [§11, Known limitations](11-limitations.md) for the importer's own scoping 
 
 ---
 
-Previous: [11. Known limitations](11-limitations.md) · [Back to index](README.md)
+Previous: [11. Known limitations](11-limitations.md) · Next: [13. Validating a migration](13-openapi-diff.md)
